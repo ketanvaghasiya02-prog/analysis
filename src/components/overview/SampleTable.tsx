@@ -3,7 +3,7 @@
  * Read-only — this is research data inspection, not order entry.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -59,13 +59,19 @@ const columns: ColumnDef<GapSample>[] = [
 ];
 
 export function SampleTable() {
-  const { activeSamples } = useData();
+  const { filteredSamples } = useData();
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 25,
   });
 
-  const data = useMemo(() => activeSamples, [activeSamples]);
+  const data = useMemo(() => filteredSamples, [filteredSamples]);
+
+  // Reset to the first page whenever the underlying set changes (mode/filters),
+  // so a stale page index never lands the user on an empty page.
+  useEffect(() => {
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+  }, [filteredSamples]);
 
   const table = useReactTable({
     data,

@@ -17,6 +17,8 @@ import {
   type AnalysisMode,
   type AnalysisSelection,
   type CombinedDataset,
+  type FilterOptions,
+  type FilterState,
   type GapSample,
 } from '@/types/gap';
 import { mergeDataset, parseFiles } from '@/utils/csvParser';
@@ -25,12 +27,22 @@ import {
   type ValidationReport,
 } from '@/utils/validation';
 import { selectSamples } from '@/utils/selection';
+import {
+  applyFilters,
+  buildFilterOptions,
+  EMPTY_FILTERS,
+} from '@/utils/filters';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
   validation: ValidationReport | null;
   selection: AnalysisSelection;
+  /** Samples after the analysis-mode selection only (pre-filters). */
   activeSamples: GapSample[];
+  /** Samples after analysis mode AND global filters — the canonical view set. */
+  filteredSamples: GapSample[];
+  filters: FilterState;
+  filterOptions: FilterOptions | null;
   isParsing: boolean;
   hasData: boolean;
 
@@ -40,6 +52,10 @@ interface DataContextValue {
   setMode: (mode: AnalysisMode) => void;
   setSingleDay: (day: string) => void;
   setCustomRange: (start: string | null, end: string | null) => void;
+
+  setFilters: (next: FilterState) => void;
+  updateFilters: (patch: Partial<FilterState>) => void;
+  resetFilters: () => void;
 }
 
 const DEFAULT_SELECTION: AnalysisSelection = {
@@ -53,6 +69,7 @@ const DataContext = createContext<DataContextValue | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [dataset, setDataset] = useState<CombinedDataset | null>(null);
   const [selection, setSelection] = useState<AnalysisSelection>(DEFAULT_SELECTION);
+  const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS);
   const [isParsing, setIsParsing] = useState(false);
 
   const addFiles = useCallback(
@@ -83,6 +100,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => {
     setDataset(null);
     setSelection(DEFAULT_SELECTION);
+    setFiltersState(EMPTY_FILTERS);
+  }, []);
+
+  const setFilters = useCallback((next: FilterState) => {
+    setFiltersState(next);
+  }, []);
+
+  const updateFilters = useCallback((patch: Partial<FilterState>) => {
+    setFiltersState((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setFiltersState(EMPTY_FILTERS);
   }, []);
 
   const setMode = useCallback(
@@ -130,12 +160,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [dataset, selection],
   );
 
+  // Filter facets are derived from the full dataset so options stay stable
+  // regardless of the active mode/filter narrowing.
+  const filterOptions = useMemo(
+    () => (dataset ? buildFilterOptions(dataset.samples) : null),
+    [dataset],
+  );
+
+  // Canonical view set: analysis-mode selection refined by global filters.
+  const filteredSamples = useMemo(
+    () => applyFilters(activeSamples, filters),
+    [activeSamples, filters],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       dataset,
       validation,
       selection,
       activeSamples,
+      filteredSamples,
+      filters,
+      filterOptions,
       isParsing,
       hasData: !!dataset && dataset.samples.length > 0,
       addFiles,
@@ -143,18 +189,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setMode,
       setSingleDay,
       setCustomRange,
+      setFilters,
+      updateFilters,
+      resetFilters,
     }),
     [
       dataset,
       validation,
       selection,
       activeSamples,
+      filteredSamples,
+      filters,
+      filterOptions,
       isParsing,
       addFiles,
       reset,
       setMode,
       setSingleDay,
       setCustomRange,
+      setFilters,
+      updateFilters,
+      resetFilters,
     ],
   );
 

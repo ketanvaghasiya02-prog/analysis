@@ -1,5 +1,13 @@
 /**
- * Overview dashboard composition (Phase R1).
+ * Overview dashboard composition (Phase R1 + R2).
+ *
+ * Layout order:
+ *   Analysis mode → Global filters → Overview cards → Gap trend
+ *   → [Day-wise modules when in Day Wise mode] → Validation → Sample inspector
+ *
+ * Day-wise modules (analysis table, comparison charts, comparison table) show
+ * in "Day Wise Analysis" mode. Single Day / Custom Range narrow the whole
+ * dashboard via the shared `filteredSamples` selection.
  */
 
 import { useData } from '@/context/DataContext';
@@ -12,9 +20,13 @@ import { AnalysisModeSelector } from '@/components/common/AnalysisModeSelector';
 import { SampleTable } from '@/components/overview/SampleTable';
 import { DayWiseTable } from '@/components/overview/DayWiseTable';
 import { GapTrendChart } from '@/components/overview/GapTrendChart';
+import { FilterBar } from '@/components/filters/FilterBar';
+import { DayComparisonCharts } from '@/components/comparison/DayComparisonCharts';
+import { DayComparisonTable } from '@/components/comparison/DayComparisonTable';
 
 export function Dashboard() {
   const { hasData, selection } = useData();
+  const showDayModules = selection.mode === 'day-wise';
 
   return (
     <AppLayout>
@@ -31,9 +43,18 @@ export function Dashboard() {
       ) : (
         <div className="space-y-5">
           <AnalysisModeSelector />
+          <FilterBar />
           <OverviewCards />
           <GapTrendChart />
-          {selection.mode === 'day-wise' && <DayWiseTable />}
+
+          {showDayModules && (
+            <>
+              <DayComparisonCharts />
+              <DayWiseTable />
+              <DayComparisonTable />
+            </>
+          )}
+
           <ValidationPanel />
           <SampleTable />
         </div>

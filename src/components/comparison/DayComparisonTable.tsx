@@ -1,20 +1,33 @@
 /**
- * Day-wise analysis table (Phase R2, feature #2).
+ * Day comparison table (Phase R2, feature #3).
  *
- * Per trading day: samples, average/median/max/min gap, range, std dev,
- * sync quality % and most-common session. Respects the active analysis mode
- * and global filters by reading `filteredSamples`.
+ * Columns: Date · Samples · Average Gap · Max Gap · Min Gap · Std Dev ·
+ * Best Session · Sync Quality · Data Quality.
+ *
+ * "Best Session" is the most active session for the day. Reads
+ * `filteredSamples`, so it honours the analysis mode and global filters.
  */
 
 import { useMemo } from 'react';
 import { useData } from '@/context/DataContext';
 import { computeDayStats } from '@/utils/dayAnalysis';
 import { fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
-import { LayersIcon } from '@/components/common/icons';
+import { TableIcon } from '@/components/common/icons';
 
-export function DayWiseTable() {
+function QualityCell({ value }: { value: number | null }) {
+  const tone =
+    value === null
+      ? 'text-ink-faint'
+      : value >= 95
+        ? 'text-positive'
+        : value >= 80
+          ? 'text-warning'
+          : 'text-negative';
+  return <span className={tone}>{fmtPercent(value)}</span>;
+}
+
+export function DayComparisonTable() {
   const { filteredSamples } = useData();
-
   const rows = useMemo(
     () => computeDayStats(filteredSamples),
     [filteredSamples],
@@ -23,9 +36,9 @@ export function DayWiseTable() {
   return (
     <section className="card overflow-hidden">
       <header className="flex items-center gap-2 border-b border-panel-border px-5 py-3">
-        <LayersIcon className="text-base text-accent" />
+        <TableIcon className="text-base text-accent" />
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">
-          Day-wise Analysis
+          Day Comparison
         </h2>
         <span className="ml-auto text-xs text-ink-faint">
           {rows.length} day{rows.length === 1 ? '' : 's'}
@@ -43,14 +56,13 @@ export function DayWiseTable() {
               <tr>
                 <th className="px-3 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 text-right font-medium">Samples</th>
-                <th className="px-3 py-2 text-right font-medium">Avg Gap</th>
-                <th className="px-3 py-2 text-right font-medium">Median</th>
-                <th className="px-3 py-2 text-right font-medium">Max</th>
-                <th className="px-3 py-2 text-right font-medium">Min</th>
-                <th className="px-3 py-2 text-right font-medium">Range</th>
+                <th className="px-3 py-2 text-right font-medium">Average Gap</th>
+                <th className="px-3 py-2 text-right font-medium">Max Gap</th>
+                <th className="px-3 py-2 text-right font-medium">Min Gap</th>
                 <th className="px-3 py-2 text-right font-medium">Std Dev</th>
-                <th className="px-3 py-2 text-right font-medium">Sync %</th>
-                <th className="px-3 py-2 font-medium">Session</th>
+                <th className="px-3 py-2 font-medium">Best Session</th>
+                <th className="px-3 py-2 text-right font-medium">Sync Quality</th>
+                <th className="px-3 py-2 text-right font-medium">Data Quality</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-panel-border font-mono text-xs">
@@ -63,9 +75,6 @@ export function DayWiseTable() {
                   <td className="px-3 py-2 text-right text-accent">
                     {fmtNumber(r.avgGap, 3)}
                   </td>
-                  <td className="px-3 py-2 text-right text-ink-muted">
-                    {fmtNumber(r.medianGap, 3)}
-                  </td>
                   <td className="px-3 py-2 text-right text-positive">
                     {fmtNumber(r.maxGap, 3)}
                   </td>
@@ -73,23 +82,16 @@ export function DayWiseTable() {
                     {fmtNumber(r.minGap, 3)}
                   </td>
                   <td className="px-3 py-2 text-right text-ink-muted">
-                    {fmtNumber(r.range, 3)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-ink-muted">
                     {fmtNumber(r.stdDev, 3)}
-                  </td>
-                  <td
-                    className={[
-                      'px-3 py-2 text-right',
-                      r.syncQualityPct !== null && r.syncQualityPct >= 95
-                        ? 'text-positive'
-                        : 'text-warning',
-                    ].join(' ')}
-                  >
-                    {fmtPercent(r.syncQualityPct)}
                   </td>
                   <td className="px-3 py-2 font-sans text-ink-muted">
                     {r.mostCommonSession}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <QualityCell value={r.syncQualityPct} />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <QualityCell value={r.dataQualityPct} />
                   </td>
                 </tr>
               ))}

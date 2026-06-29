@@ -148,3 +148,31 @@ export interface AnalysisSelection {
   /** Active bounds for "custom-range" mode (inclusive, YYYY-MM-DD). */
   customRange: DateRange;
 }
+
+/**
+ * Global, cross-cutting filters (Phase R2). Applied on top of the analysis
+ * mode's base sample set. Empty arrays / null bounds mean "no constraint".
+ */
+export interface FilterState {
+  /** Inclusive day-key bounds (YYYY-MM-DD). */
+  dateRange: DateRange;
+  /** Allowed CurrentSession values; empty = all. */
+  sessions: string[];
+  /** Allowed SyncStatus values; empty = all. */
+  syncStatuses: string[];
+  /** Allowed "SPOT/FUTURE" symbol pairs; empty = all. */
+  symbolPairs: string[];
+  /** Inclusive lower bound on Gap; null = unbounded. */
+  gapMin: number | null;
+  /** Inclusive upper bound on Gap; null = unbounded. */
+  gapMax: number | null;
+}
+
+/** Facet values derived from the dataset to populate filter controls. */
+export interface FilterOptions {
+  sessions: string[];
+  syncStatuses: string[];
+  symbolPairs: string[];
+  gapBounds: { min: number | null; max: number | null };
+  dayBounds: { min: string | null; max: string | null };
+}

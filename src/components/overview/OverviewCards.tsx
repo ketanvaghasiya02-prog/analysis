@@ -16,13 +16,13 @@ import {
 } from '@/components/common/icons';
 
 export function OverviewCards() {
-  const { dataset, activeSamples, validation } = useData();
+  const { dataset, filteredSamples, validation } = useData();
 
   const stats = useMemo(() => {
-    const gaps = gapSummary(activeSamples);
-    const sync = syncQualityPct(activeSamples);
+    const gaps = gapSummary(filteredSamples);
+    const sync = syncQualityPct(filteredSamples);
     return { gaps, sync };
-  }, [activeSamples]);
+  }, [filteredSamples]);
 
   if (!dataset || !validation) return null;
 
@@ -53,7 +53,7 @@ export function OverviewCards() {
       />
       <StatCard
         label="Total Samples"
-        value={fmtInt(activeSamples.length)}
+        value={fmtInt(filteredSamples.length)}
         hint={`${fmtInt(validation.validRows)} valid in dataset`}
         icon={<LayersIcon className="text-base" />}
       />

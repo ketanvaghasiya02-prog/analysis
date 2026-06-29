@@ -19,10 +19,10 @@ import { ChartIcon } from '@/components/common/icons';
 const MAX_POINTS = 600;
 
 export function GapTrendChart() {
-  const { activeSamples } = useData();
+  const { filteredSamples } = useData();
 
   const data = useMemo(() => {
-    const withGap = activeSamples.filter((s) => s.gap !== null);
+    const withGap = filteredSamples.filter((s) => s.gap !== null);
     const step = Math.max(1, Math.ceil(withGap.length / MAX_POINTS));
     const points: Array<{ t: string; gap: number; idx: number }> = [];
     for (let i = 0; i < withGap.length; i += step) {
@@ -35,7 +35,7 @@ export function GapTrendChart() {
       });
     }
     return points;
-  }, [activeSamples]);
+  }, [filteredSamples]);
 
   return (
     <section className="card p-5">
@@ -48,7 +48,7 @@ export function GapTrendChart() {
         </div>
         <span className="text-xs text-ink-faint">
           {data.length.toLocaleString()} points
-          {activeSamples.length > data.length ? ' (sampled)' : ''}
+          {filteredSamples.length > data.length ? ' (sampled)' : ''}
         </span>
       </header>
 

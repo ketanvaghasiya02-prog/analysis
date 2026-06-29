@@ -6,10 +6,12 @@ import { useData } from '@/context/DataContext';
 import { describeSelection } from '@/utils/selection';
 import { formatDayLabel } from '@/utils/date';
 import { fmtInt } from '@/utils/format';
+import { activeFilterCount } from '@/utils/filters';
 import { CalendarIcon } from '@/components/common/icons';
 
 export function Header() {
-  const { dataset, validation, selection, activeSamples, isParsing } = useData();
+  const { dataset, validation, selection, filteredSamples, filters, isParsing } =
+    useData();
 
   const range = validation?.dateRange;
   const rangeLabel =
@@ -27,7 +29,12 @@ export function Header() {
         </h1>
         <p className="text-xs text-ink-muted">
           {dataset ? describeSelection(selection) : 'Upload CSV files to begin'}
-          {dataset ? ` · ${fmtInt(activeSamples.length)} samples in view` : ''}
+          {dataset ? ` · ${fmtInt(filteredSamples.length)} samples in view` : ''}
+          {dataset && activeFilterCount(filters) > 0
+            ? ` · ${activeFilterCount(filters)} filter${
+                activeFilterCount(filters) > 1 ? 's' : ''
+              } active`
+            : ''}
         </p>
       </div>
 
