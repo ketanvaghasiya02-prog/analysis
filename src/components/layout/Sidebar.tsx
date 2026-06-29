@@ -12,6 +12,7 @@ import {
   GaugeIcon,
   LayersIcon,
   RecoveryIcon,
+  ReplayIcon,
   ShieldIcon,
   TableIcon,
   TrashIcon,
@@ -40,6 +41,7 @@ export function Sidebar() {
     { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
     { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
     { id: 'failed', label: 'Failed Events', icon: WarningIcon },
+    { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
   ];
 
   return (

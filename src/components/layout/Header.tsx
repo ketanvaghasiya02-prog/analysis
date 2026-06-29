@@ -31,7 +31,9 @@ export function Header() {
             ? 'Stop-Loss Research'
             : view === 'failed'
               ? 'Failed Recovery Analysis'
-              : 'Gap Analysis Overview';
+              : view === 'explorer'
+                ? 'Event Explorer & Replay'
+                : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

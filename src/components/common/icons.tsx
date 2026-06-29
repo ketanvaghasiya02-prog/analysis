@@ -130,6 +130,16 @@ export function WarningIcon(props: IconProps) {
   );
 }
 
+export function ReplayIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 12a9 9 0 1 1 2.6 6.3" />
+      <path d="M3 20v-4h4" />
+      <path d="M10 9l5 3-5 3V9Z" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
