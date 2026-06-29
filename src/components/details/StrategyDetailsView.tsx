@@ -72,7 +72,7 @@ type OccSortKey = 'date' | 'maxGap' | 'recoveryTimeSec' | 'holdingSec' | 'entryG
 export function StrategyDetailsView() {
   const { setView } = useData();
   const { records } = useRepository();
-  const { focus } = useStrategyFocus();
+  const { focus, setFocus } = useStrategyFocus();
 
   const record = useMemo(
     () => (focus ? records.find((r) => r.key === focus.key) ?? null : null),
@@ -123,6 +123,15 @@ export function StrategyDetailsView() {
       setSortKey(k);
       setDesc(k !== 'date');
     }
+  };
+
+  // Open the read-only replay for a specific occurrence (by its index in the
+  // record's canonical occurrence list).
+  const openReplay = (occ: OccurrenceRecord) => {
+    if (!focus || !record) return;
+    const idx = record.occurrences.indexOf(occ);
+    setFocus({ ...focus, occurrenceIndex: idx >= 0 ? idx : 0 });
+    setView('replay');
   };
 
   // --- empty states -----------------------------------------------------------
@@ -390,6 +399,7 @@ export function StrategyDetailsView() {
                 <OccTh label="Recovery Time" k="recoveryTimeSec" sortKey={sortKey} desc={desc} onSort={toggleSort} align="right" />
                 <OccTh label="Holding Time" k="holdingSec" sortKey={sortKey} desc={desc} onSort={toggleSort} align="right" />
                 <th className="px-3 py-2 font-medium">Outcome</th>
+                <th className="px-3 py-2 text-right font-medium">Replay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-panel-border font-mono text-xs">
@@ -404,11 +414,16 @@ export function StrategyDetailsView() {
                   <td className="px-3 py-1.5 text-right text-ink-muted">{fmtDuration(o.recoveryTimeSec)}</td>
                   <td className="px-3 py-1.5 text-right text-ink-muted">{fmtDuration(o.holdingSec)}</td>
                   <td className="px-3 py-1.5 font-sans text-ink-muted">{OUTCOME_LABELS[o.outcome]}</td>
+                  <td className="px-3 py-1.5 text-right">
+                    <button type="button" onClick={() => openReplay(o)} className="btn px-2 py-0.5 text-[11px]">
+                      ▶ Replay
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filteredOcc.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-ink-faint">
+                  <td colSpan={10} className="px-3 py-6 text-center text-ink-faint">
                     {occurrences.length === 0
                       ? 'No per-occurrence evidence stored for this strategy.'
                       : 'No occurrences match the search / filter.'}

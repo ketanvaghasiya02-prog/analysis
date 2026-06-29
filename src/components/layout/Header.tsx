@@ -48,9 +48,11 @@ export function Header() {
                             ? 'Strategy Ranking'
                             : view === 'strategy-details'
                               ? 'Historical Strategy Details'
-                              : view === 'settings'
-                                ? 'Settings'
-                                : 'Gap Analysis Overview';
+                              : view === 'replay'
+                                ? 'Historical Evidence Replay'
+                                : view === 'settings'
+                                  ? 'Settings'
+                                  : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

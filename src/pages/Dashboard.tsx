@@ -25,6 +25,7 @@ import { StrategyFinderView } from '@/components/strategyfinder/StrategyFinderVi
 import { RepositoryView } from '@/components/repository/RepositoryView';
 import { StrategyRankingView } from '@/components/ranking/StrategyRankingView';
 import { StrategyDetailsView } from '@/components/details/StrategyDetailsView';
+import { ReplayView } from '@/components/replay/ReplayView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -62,6 +63,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <StrategyDetailsView />
+      </AppLayout>
+    );
+  }
+
+  // Replay reconstructs the path from stored data + the loaded dataset samples.
+  if (view === 'replay') {
+    return (
+      <AppLayout>
+        <ReplayView />
       </AppLayout>
     );
   }

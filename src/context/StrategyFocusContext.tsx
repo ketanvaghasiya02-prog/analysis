@@ -13,6 +13,8 @@ export interface StrategyFocus {
   rank: number | null;
   overall: number | null;
   modeLabel: string | null;
+  /** Selected occurrence index (into the record's occurrences) for replay. */
+  occurrenceIndex?: number | null;
 }
 
 interface StrategyFocusContextValue {
