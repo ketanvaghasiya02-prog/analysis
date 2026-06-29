@@ -16,3 +16,6 @@ coverage
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# Git bundles (generated for out-of-band delivery, not source)
+*.bundle
