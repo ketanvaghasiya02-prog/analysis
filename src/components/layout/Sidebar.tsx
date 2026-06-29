@@ -10,6 +10,7 @@ import {
   ChartIcon,
   FileIcon,
   LayersIcon,
+  RecoveryIcon,
   TableIcon,
   TrashIcon,
 } from '@/components/common/icons';
@@ -32,6 +33,7 @@ export function Sidebar() {
       icon: LayersIcon,
       badge: hasData ? fmtInt(events.events.length) : undefined,
     },
+    { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
   ];
 
   return (

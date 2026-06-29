@@ -39,8 +39,12 @@ import {
   type GapZone,
 } from '@/utils/histogram';
 import { detectZoneEvents, type EventDetectionResult } from '@/utils/events';
+import {
+  DEFAULT_RECOVERY_SETTINGS,
+  type RecoverySettings,
+} from '@/utils/recovery';
 
-export type AppView = 'overview' | 'events';
+export type AppView = 'overview' | 'events' | 'recovery';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
@@ -62,6 +66,9 @@ interface DataContextValue {
   selectedZone: GapZone | null;
   events: EventDetectionResult;
 
+  // Recovery analysis settings (Phase R5).
+  recoverySettings: RecoverySettings;
+
   // Navigation.
   view: AppView;
 
@@ -79,6 +86,9 @@ interface DataContextValue {
   setGapBinSize: (size: number) => void;
   selectZone: (id: string | null) => void;
   toggleZone: (id: string) => void;
+
+  updateRecoverySettings: (patch: Partial<RecoverySettings>) => void;
+  resetRecoverySettings: () => void;
 
   setView: (view: AppView) => void;
 }
@@ -98,6 +108,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isParsing, setIsParsing] = useState(false);
   const [gapBinSize, setGapBinSizeState] = useState(DEFAULT_BIN_SIZE);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [recoverySettings, setRecoverySettings] = useState<RecoverySettings>(
+    DEFAULT_RECOVERY_SETTINGS,
+  );
   const [view, setView] = useState<AppView>('overview');
 
   const addFiles = useCallback(
@@ -131,7 +144,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setFiltersState(EMPTY_FILTERS);
     setGapBinSizeState(DEFAULT_BIN_SIZE);
     setSelectedZoneId(null);
+    setRecoverySettings(DEFAULT_RECOVERY_SETTINGS);
     setView('overview');
+  }, []);
+
+  const updateRecoverySettings = useCallback(
+    (patch: Partial<RecoverySettings>) => {
+      setRecoverySettings((prev) => ({ ...prev, ...patch }));
+    },
+    [],
+  );
+
+  const resetRecoverySettings = useCallback(() => {
+    setRecoverySettings(DEFAULT_RECOVERY_SETTINGS);
   }, []);
 
   const setGapBinSize = useCallback((size: number) => {
@@ -253,6 +278,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       selectedZoneId,
       selectedZone,
       events,
+      recoverySettings,
       view,
       addFiles,
       reset,
@@ -265,6 +291,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setGapBinSize,
       selectZone,
       toggleZone,
+      updateRecoverySettings,
+      resetRecoverySettings,
       setView,
     }),
     [
@@ -281,6 +309,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       selectedZoneId,
       selectedZone,
       events,
+      recoverySettings,
       view,
       addFiles,
       reset,
@@ -293,6 +322,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setGapBinSize,
       selectZone,
       toggleZone,
+      updateRecoverySettings,
+      resetRecoverySettings,
     ],
   );
 

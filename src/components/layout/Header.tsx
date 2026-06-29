@@ -20,7 +20,12 @@ export function Header() {
     view,
   } = useData();
 
-  const title = view === 'events' ? 'Zone Event Analysis' : 'Gap Analysis Overview';
+  const title =
+    view === 'events'
+      ? 'Zone Event Analysis'
+      : view === 'recovery'
+        ? 'Recovery Matrix'
+        : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =
