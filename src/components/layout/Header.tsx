@@ -1,0 +1,48 @@
+/**
+ * Top header: title, active selection summary and detected date range.
+ */
+
+import { useData } from '@/context/DataContext';
+import { describeSelection } from '@/utils/selection';
+import { formatDayLabel } from '@/utils/date';
+import { fmtInt } from '@/utils/format';
+import { CalendarIcon } from '@/components/common/icons';
+
+export function Header() {
+  const { dataset, validation, selection, activeSamples, isParsing } = useData();
+
+  const range = validation?.dateRange;
+  const rangeLabel =
+    range?.start && range?.end
+      ? range.start === range.end
+        ? formatDayLabel(range.start)
+        : `${formatDayLabel(range.start)} — ${formatDayLabel(range.end)}`
+      : 'No data loaded';
+
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-panel-border bg-panel-raised px-6 py-3">
+      <div>
+        <h1 className="text-base font-semibold text-ink">
+          Gap Analysis Overview
+        </h1>
+        <p className="text-xs text-ink-muted">
+          {dataset ? describeSelection(selection) : 'Upload CSV files to begin'}
+          {dataset ? ` · ${fmtInt(activeSamples.length)} samples in view` : ''}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {isParsing && (
+          <span className="flex items-center gap-2 text-xs text-accent">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+            Parsing…
+          </span>
+        )}
+        <div className="flex items-center gap-2 rounded-md border border-panel-border bg-panel px-3 py-1.5">
+          <CalendarIcon className="text-base text-accent" />
+          <span className="text-sm font-medium text-ink">{rangeLabel}</span>
+        </div>
+      </div>
+    </header>
+  );
+}
