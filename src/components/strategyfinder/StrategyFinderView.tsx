@@ -11,8 +11,9 @@
  * research and stores the results.
  */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useData } from '@/context/DataContext';
+import { useRepository } from '@/context/RepositoryContext';
 import {
   DEFAULT_STRATEGY_FINDER_INPUT,
   generateStrategies,
@@ -113,6 +114,31 @@ export function StrategyFinderView() {
 
   // Phase 11B: execution controller (sequential, cached, interruptible).
   const exec = useStrategyExecution(readyCombos, dateFilteredSamples, input.minTrades);
+
+  // Phase 11C: publish COMPLETED results to the central Research Repository.
+  // Additive side-effect only — no execution or calculation is changed. The
+  // repository de-duplicates by strategy key, so re-publishing is a no-op.
+  const { ingest } = useRepository();
+  useEffect(() => {
+    const items = exec.executions
+      .filter((e) => e.status === 'COMPLETED' && e.result)
+      .map((e) => ({
+        id: e.id,
+        result: e.result!,
+        sameDayOnly: input.sameDayOnly,
+        dateFrom: input.dateRange.from,
+        dateTo: input.dateRange.to,
+        sessions: input.sessions,
+      }));
+    if (items.length > 0) ingest(items);
+  }, [
+    exec.executions,
+    ingest,
+    input.sameDayOnly,
+    input.dateRange.from,
+    input.dateRange.to,
+    input.sessions,
+  ]);
 
   const sessionOptions = filterOptions?.sessions ?? [];
 

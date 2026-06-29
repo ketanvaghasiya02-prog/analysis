@@ -61,6 +61,7 @@ export type AppView =
   | 'lab'
   | 'sl-optimizer'
   | 'strategy-finder'
+  | 'repository'
   | 'settings';
 
 interface DataContextValue {

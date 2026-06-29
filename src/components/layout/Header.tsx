@@ -42,9 +42,11 @@ export function Header() {
                       ? 'Stop Loss Optimizer'
                       : view === 'strategy-finder'
                         ? 'Historical Strategy Finder'
-                        : view === 'settings'
-                          ? 'Settings'
-                          : 'Gap Analysis Overview';
+                        : view === 'repository'
+                          ? 'Research Repository'
+                          : view === 'settings'
+                            ? 'Settings'
+                            : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

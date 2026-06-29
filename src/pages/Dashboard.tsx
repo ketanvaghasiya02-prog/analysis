@@ -22,6 +22,7 @@ import { SettingsView } from '@/components/settings/SettingsView';
 import { ResearchLabView } from '@/components/lab/ResearchLabView';
 import { SlOptimizerView } from '@/components/sloptimizer/SlOptimizerView';
 import { StrategyFinderView } from '@/components/strategyfinder/StrategyFinderView';
+import { RepositoryView } from '@/components/repository/RepositoryView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -31,6 +32,16 @@ export function Dashboard() {
     return (
       <AppLayout>
         <SettingsView />
+      </AppLayout>
+    );
+  }
+
+  // The Research Repository persists results independently of the dataset, so
+  // it stays reachable even when no dataset is currently loaded.
+  if (view === 'repository') {
+    return (
+      <AppLayout>
+        <RepositoryView />
       </AppLayout>
     );
   }
