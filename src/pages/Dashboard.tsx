@@ -3,6 +3,7 @@
  *
  * Layout order:
  *   Analysis mode → Global filters → Overview cards → Gap trend
+ *   → Gap distribution (histogram + zone summary)
  *   → [Day-wise modules when in Day Wise mode] → Validation → Sample inspector
  *
  * Day-wise modules (analysis table, comparison charts, comparison table) show
@@ -23,6 +24,7 @@ import { GapTrendChart } from '@/components/overview/GapTrendChart';
 import { FilterBar } from '@/components/filters/FilterBar';
 import { DayComparisonCharts } from '@/components/comparison/DayComparisonCharts';
 import { DayComparisonTable } from '@/components/comparison/DayComparisonTable';
+import { GapDistribution } from '@/components/distribution/GapDistribution';
 
 export function Dashboard() {
   const { hasData, selection } = useData();
@@ -46,6 +48,7 @@ export function Dashboard() {
           <FilterBar />
           <OverviewCards />
           <GapTrendChart />
+          <GapDistribution />
 
           {showDayModules && (
             <>
