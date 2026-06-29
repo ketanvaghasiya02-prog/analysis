@@ -25,8 +25,19 @@ import { SensitivityTable } from '@/components/lab/SensitivityTable';
 import { ScenarioEventTable } from '@/components/lab/ScenarioEventTable';
 import { ScenarioCharts } from '@/components/lab/ScenarioCharts';
 import { ScenarioPathChart } from '@/components/lab/ScenarioPathChart';
+import { TopTradeFinder } from '@/components/lab/TopTradeFinder';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { AlertIcon } from '@/components/common/icons';
+import {
+  describeDtRange,
+  isDtRangeActive,
+  scopeByDateTime,
+  EMPTY_DT_RANGE,
+  type DateTimeRange,
+} from '@/utils/dateRange';
+import { fmtInt } from '@/utils/format';
+
+const MIN_RANGE_SAMPLES = 100;
 
 function NumField({
   label,
@@ -60,14 +71,28 @@ export function ResearchLabView() {
   const { filteredSamples, filterOptions } = useData();
   const [input, setInput] = useState<ScenarioInput>(DEFAULT_SCENARIO_INPUT);
   const [selected, setSelected] = useState<ScenarioEvent | null>(null);
+  const [dtRange, setDtRange] = useState<DateTimeRange>(EMPTY_DT_RANGE);
 
   const patch = (p: Partial<ScenarioInput>) =>
     setInput((prev) => ({ ...prev, ...p }));
+  const patchRange = (p: Partial<DateTimeRange>) =>
+    setDtRange((prev) => ({ ...prev, ...p }));
+
+  // Active Research Lab dataset: global filters → date-time range scope.
+  const labSamples = useMemo(
+    () => scopeByDateTime(filteredSamples, dtRange),
+    [filteredSamples, dtRange],
+  );
+
+  const daysCovered = useMemo(
+    () => new Set(labSamples.map((s) => s.dayKey)).size,
+    [labSamples],
+  );
 
   // Heavy work memoized — recomputes only when the dataset or inputs change.
   const result = useMemo(
-    () => computeScenario(filteredSamples, input),
-    [filteredSamples, input],
+    () => computeScenario(labSamples, input),
+    [labSamples, input],
   );
   const sensitivity = useMemo(
     () => computeSensitivity(result.events, input),
@@ -101,6 +126,16 @@ export function ResearchLabView() {
   const sessionOptions = filterOptions?.sessions ?? [];
   const syncOptions = filterOptions?.syncStatuses ?? [];
 
+  // Date-time range warnings.
+  const rangeWarnings: string[] = [];
+  if (isDtRangeActive(dtRange) && labSamples.length === 0) {
+    rangeWarnings.push('No data found in the selected date-time range.');
+  } else if (labSamples.length > 0 && labSamples.length < MIN_RANGE_SAMPLES) {
+    rangeWarnings.push(
+      `Only ${labSamples.length} samples in the selected range (below ${MIN_RANGE_SAMPLES}). Results may be unstable.`,
+    );
+  }
+
   const stamp = () => new Date().toISOString();
 
   return (
@@ -112,6 +147,109 @@ export function ResearchLabView() {
           This is not a trading signal. It only shows what happened historically
           for this scenario, measured in gap points across the currently filtered
           data. No orders, no money, no buy/sell recommendation.
+        </p>
+      </section>
+
+      {/* Date-time range */}
+      <section className="card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="stat-label">Date-Time Range</span>
+          <div className="flex items-center gap-3 text-xs text-ink-muted">
+            <span>
+              Range:{' '}
+              <span className="font-medium text-ink">
+                {describeDtRange(dtRange)}
+              </span>
+            </span>
+            {isDtRangeActive(dtRange) && (
+              <button
+                type="button"
+                onClick={() => setDtRange(EMPTY_DT_RANGE)}
+                className="text-ink-faint transition-colors hover:text-accent"
+              >
+                clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">Start Date</span>
+            <input
+              type="date"
+              value={dtRange.startDate ?? ''}
+              onChange={(e) => patchRange({ startDate: e.target.value || null })}
+              className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">Start Time</span>
+            <input
+              type="time"
+              value={dtRange.startTime ?? ''}
+              onChange={(e) => patchRange({ startTime: e.target.value || null })}
+              className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">End Date</span>
+            <input
+              type="date"
+              value={dtRange.endDate ?? ''}
+              onChange={(e) => patchRange({ endDate: e.target.value || null })}
+              className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">End Time</span>
+            <input
+              type="time"
+              value={dtRange.endTime ?? ''}
+              onChange={(e) => patchRange({ endTime: e.target.value || null })}
+              className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="rounded-md border border-panel-border bg-panel p-3">
+            <div className="stat-label">Samples in Range</div>
+            <div className="mt-1 font-mono text-lg text-ink">
+              {fmtInt(labSamples.length)}
+            </div>
+          </div>
+          <div className="rounded-md border border-panel-border bg-panel p-3">
+            <div className="stat-label">Days Covered</div>
+            <div className="mt-1 font-mono text-lg text-ink">
+              {fmtInt(daysCovered)}
+            </div>
+          </div>
+          <div className="rounded-md border border-panel-border bg-panel p-3">
+            <div className="stat-label">Events in Range</div>
+            <div className="mt-1 font-mono text-lg text-ink">
+              {fmtInt(result.totalEvents)}
+            </div>
+          </div>
+        </div>
+
+        {rangeWarnings.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {rangeWarnings.map((w, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning"
+              >
+                <AlertIcon className="mt-0.5 text-sm" />
+                <span>{w}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="mt-3 text-[11px] text-ink-faint">
+          This range is separate from the global dashboard filter, but applies on
+          top of it. Leave the dates empty to use all uploaded data.
         </p>
       </section>
 
@@ -230,7 +368,7 @@ export function ResearchLabView() {
 
       {activeSelected && (
         <ScenarioPathChart
-          samples={filteredSamples}
+          samples={labSamples}
           event={activeSelected}
           input={input}
         />
@@ -247,6 +385,14 @@ export function ResearchLabView() {
         events={result.events}
         selectedId={activeSelected?.id ?? null}
         onSelect={setSelected}
+      />
+
+      {/* Top Trade Finder — uses the same active Research Lab dataset. */}
+      <TopTradeFinder
+        samples={labSamples}
+        recoveryTargetTo={input.recoveryTo}
+        slLevel={input.stopLoss}
+        sessionOptions={sessionOptions}
       />
     </div>
   );
