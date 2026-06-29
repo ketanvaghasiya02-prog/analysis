@@ -8,6 +8,7 @@ import { FileUpload } from '@/components/upload/FileUpload';
 import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
+  ClockIcon,
   FileIcon,
   GaugeIcon,
   LayersIcon,
@@ -42,6 +43,7 @@ export function Sidebar() {
     { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
     { id: 'failed', label: 'Failed Events', icon: WarningIcon },
     { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
+    { id: 'session', label: 'Session Analysis', icon: ClockIcon },
   ];
 
   return (

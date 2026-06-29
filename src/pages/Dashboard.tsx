@@ -16,6 +16,7 @@ import { MaeView } from '@/components/mae/MaeView';
 import { StopLossView } from '@/components/stoploss/StopLossView';
 import { FailedEventsView } from '@/components/failed/FailedEventsView';
 import { ExplorerView } from '@/components/explorer/ExplorerView';
+import { SessionView } from '@/components/session/SessionView';
 
 export function Dashboard() {
   const { hasData, view } = useData();
@@ -44,6 +45,8 @@ export function Dashboard() {
         <FailedEventsView />
       ) : view === 'explorer' ? (
         <ExplorerView />
+      ) : view === 'session' ? (
+        <SessionView />
       ) : (
         <OverviewView />
       )}

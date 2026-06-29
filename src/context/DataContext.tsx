@@ -55,7 +55,8 @@ export type AppView =
   | 'mae'
   | 'stoploss'
   | 'failed'
-  | 'explorer';
+  | 'explorer'
+  | 'session';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;

@@ -33,7 +33,9 @@ export function Header() {
               ? 'Failed Recovery Analysis'
               : view === 'explorer'
                 ? 'Event Explorer & Replay'
-                : 'Gap Analysis Overview';
+                : view === 'session'
+                  ? 'Session Recovery & Risk'
+                  : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =
