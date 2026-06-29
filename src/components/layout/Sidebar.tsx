@@ -14,6 +14,7 @@ import {
   FlaskIcon,
   GaugeIcon,
   LayersIcon,
+  RankIcon,
   RecoveryIcon,
   ReplayIcon,
   SettingsIcon,
@@ -53,10 +54,11 @@ export function Sidebar() {
     { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
     { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
     { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
+    { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 
-  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository']);
+  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository', 'ranking']);
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">

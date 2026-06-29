@@ -44,9 +44,11 @@ export function Header() {
                         ? 'Historical Strategy Finder'
                         : view === 'repository'
                           ? 'Research Repository'
-                          : view === 'settings'
-                            ? 'Settings'
-                            : 'Gap Analysis Overview';
+                          : view === 'ranking'
+                            ? 'Strategy Ranking'
+                            : view === 'settings'
+                              ? 'Settings'
+                              : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

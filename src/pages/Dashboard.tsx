@@ -23,6 +23,7 @@ import { ResearchLabView } from '@/components/lab/ResearchLabView';
 import { SlOptimizerView } from '@/components/sloptimizer/SlOptimizerView';
 import { StrategyFinderView } from '@/components/strategyfinder/StrategyFinderView';
 import { RepositoryView } from '@/components/repository/RepositoryView';
+import { StrategyRankingView } from '@/components/ranking/StrategyRankingView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -42,6 +43,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <RepositoryView />
+      </AppLayout>
+    );
+  }
+
+  // Strategy Ranking reads the repository, so it is reachable without a dataset.
+  if (view === 'ranking') {
+    return (
+      <AppLayout>
+        <StrategyRankingView />
       </AppLayout>
     );
   }

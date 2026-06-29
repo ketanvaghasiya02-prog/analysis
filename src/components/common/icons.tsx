@@ -179,6 +179,17 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+export function RankIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 20V10" />
+      <path d="M12 20V4" />
+      <path d="M18 20v-7" />
+      <path d="M3 20h18" />
+    </svg>
+  );
+}
+
 export function DatabaseIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

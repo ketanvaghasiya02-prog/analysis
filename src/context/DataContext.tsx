@@ -62,6 +62,7 @@ export type AppView =
   | 'sl-optimizer'
   | 'strategy-finder'
   | 'repository'
+  | 'ranking'
   | 'settings';
 
 interface DataContextValue {
