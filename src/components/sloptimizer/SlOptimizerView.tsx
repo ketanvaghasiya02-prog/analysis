@@ -6,7 +6,7 @@
  * description of what historically happened. Gap points only.
  */
 
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useData } from '@/context/DataContext';
 import {
   DEFAULT_SL_OPTIMIZER_INPUT,
@@ -15,15 +15,15 @@ import {
   printOptimizerPdf,
   runSlOptimizer,
   type SlOptimizerInput,
-  type SlOptimizerRow,
 } from '@/utils/slOptimizer';
 import { downloadExport } from '@/utils/reports';
 import { SlOptimizerTable } from '@/components/sloptimizer/SlOptimizerTable';
 import { SlOptimizerValidation } from '@/components/sloptimizer/SlOptimizerValidation';
 import { SlOptimizerCharts } from '@/components/sloptimizer/SlOptimizerCharts';
+import { SlOptimizerSummary } from '@/components/sloptimizer/SlOptimizerSummary';
+import { SlOptimizerInsights } from '@/components/sloptimizer/SlOptimizerInsights';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
-import { StatCard } from '@/components/overview/StatCard';
-import { fmtDuration, fmtNumber, fmtPercent } from '@/utils/format';
+import { fmtNumber, fmtPercent } from '@/utils/format';
 import { AlertIcon } from '@/components/common/icons';
 
 function NumField({
@@ -54,37 +54,21 @@ function NumField({
   );
 }
 
-function HighlightCard({
-  label,
-  row,
-  metric,
-  tooltip,
-}: {
-  label: string;
-  row: SlOptimizerRow | null;
-  metric: (r: SlOptimizerRow) => string;
-  tooltip: string;
-}) {
-  return (
-    <StatCard
-      label={label}
-      tooltip={tooltip}
-      tone="accent"
-      value={row ? <span className="text-base">{fmtNumber(row.stopLoss, 2)}</span> : '—'}
-      hint={row ? metric(row) : undefined}
-    />
-  );
-}
-
 export function SlOptimizerView() {
   const { filteredSamples, filterOptions } = useData();
   const [input, setInput] = useState<SlOptimizerInput>(DEFAULT_SL_OPTIMIZER_INPUT);
 
   const patch = (p: Partial<SlOptimizerInput>) => setInput((prev) => ({ ...prev, ...p }));
 
+  // Defer the heavy sweep so rapid input changes stay responsive and we can show
+  // a loading indicator while the optimizer recomputes. The calculation itself
+  // is unchanged — only when it runs.
+  const deferredInput = useDeferredValue(input);
+  const isComputing = deferredInput !== input;
+
   const result = useMemo(
-    () => runSlOptimizer(filteredSamples, input),
-    [filteredSamples, input],
+    () => runSlOptimizer(filteredSamples, deferredInput),
+    [filteredSamples, deferredInput],
   );
 
   const positions = result.rows[0]?.totalPositions ?? 0;
@@ -182,44 +166,23 @@ export function SlOptimizerView() {
         </button>
       </section>
 
-      {/* Highlights */}
-      <section>
-        <h2 className="stat-label mb-2">Highlights</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-          <HighlightCard
-            label="Best Balanced SL"
-            row={result.balanced}
-            tooltip="First stop-loss where increasing it further adds almost no historical recovery-before-SL."
-            metric={(r) => `recovery ${fmtPercent(r.recoveryBeforeSlPct)}`}
-          />
-          <HighlightCard
-            label="Highest Recovery SL"
-            row={result.maxSuccess}
-            tooltip="Highest historical recovery-before-SL (risk may be excessive — shown for context only)."
-            metric={(r) => `recovery ${fmtPercent(r.recoveryBeforeSlPct)}`}
-          />
-          <HighlightCard
-            label="Fastest Recovery SL"
-            row={result.fastest}
-            tooltip="Lowest average historical recovery time."
-            metric={(r) => `avg ${fmtDuration(r.avgRecoverySec)}`}
-          />
-          <HighlightCard
-            label="Lowest Risk SL"
-            row={result.lowestRisk}
-            tooltip="Lowest average maximum gap reached after entry."
-            metric={(r) => `avg max ${fmtNumber(r.avgMaxGap, 3)}`}
-          />
-          <HighlightCard
-            label="Highest Score SL"
-            row={result.highestScore}
-            tooltip="Highest balanced score (recovery, risk, holding, confidence)."
-            metric={(r) => `score ${fmtNumber(r.score, 1)}`}
-          />
-        </div>
-      </section>
+      {/* Loading indicator while the optimizer recomputes */}
+      {isComputing && (
+        <section className="flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm text-accent">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
+          Running optimizer sweep…
+        </section>
+      )}
 
-      {/* Summary */}
+      {/* Summary cards */}
+      <div className={isComputing ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+        <SlOptimizerSummary result={result} />
+      </div>
+
+      {/* Quick insights */}
+      <SlOptimizerInsights result={result} />
+
+      {/* Historical Summary */}
       {result.balanced && positions > 0 && (
         <section className="card border-accent/20 bg-accent/5 p-5">
           <h2 className="stat-label mb-3">Historical Summary</h2>

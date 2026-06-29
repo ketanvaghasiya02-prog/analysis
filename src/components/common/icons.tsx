@@ -179,6 +179,36 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 4v12" />
+      <path d="M8 12l4 4 4-4" />
+      <path d="M4 20h16" />
+    </svg>
+  );
+}
+
+export function ImageIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="M21 16l-5-5-7 7" />
+    </svg>
+  );
+}
+
+export function BulbIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 18h6" />
+      <path d="M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0 0 12 3z" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
