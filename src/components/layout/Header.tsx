@@ -40,9 +40,11 @@ export function Header() {
                     ? 'Research Lab — Scenario Testing'
                     : view === 'sl-optimizer'
                       ? 'Stop Loss Optimizer'
-                      : view === 'settings'
-                      ? 'Settings'
-                      : 'Gap Analysis Overview';
+                      : view === 'strategy-finder'
+                        ? 'Historical Strategy Finder'
+                        : view === 'settings'
+                          ? 'Settings'
+                          : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

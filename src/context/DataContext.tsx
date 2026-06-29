@@ -60,6 +60,7 @@ export type AppView =
   | 'session'
   | 'lab'
   | 'sl-optimizer'
+  | 'strategy-finder'
   | 'settings';
 
 interface DataContextValue {

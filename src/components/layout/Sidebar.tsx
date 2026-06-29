@@ -19,6 +19,7 @@ import {
   ShieldIcon,
   SlidersIcon,
   TableIcon,
+  TargetIcon,
   TrashIcon,
   WarningIcon,
 } from '@/components/common/icons';
@@ -49,6 +50,7 @@ export function Sidebar() {
     { id: 'session', label: 'Session Analysis', icon: ClockIcon },
     { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
     { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
+    { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 
