@@ -8,6 +8,7 @@ import { formatDayLabel } from '@/utils/date';
 import { fmtInt } from '@/utils/format';
 import { activeFilterCount } from '@/utils/filters';
 import { CalendarIcon } from '@/components/common/icons';
+import { ExportMenu } from '@/components/export/ExportMenu';
 
 export function Header() {
   const {
@@ -71,6 +72,7 @@ export function Header() {
           <CalendarIcon className="text-base text-accent" />
           <span className="text-sm font-medium text-ink">{rangeLabel}</span>
         </div>
+        <ExportMenu />
       </div>
     </header>
   );
