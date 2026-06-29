@@ -12,6 +12,7 @@ import {
   GaugeIcon,
   LayersIcon,
   RecoveryIcon,
+  ShieldIcon,
   TableIcon,
   TrashIcon,
 } from '@/components/common/icons';
@@ -36,6 +37,7 @@ export function Sidebar() {
     },
     { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
     { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
+    { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
   ];
 
   return (

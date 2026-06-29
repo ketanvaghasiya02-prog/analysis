@@ -27,7 +27,9 @@ export function Header() {
         ? 'Recovery Matrix'
         : view === 'mae'
           ? 'MAE Analysis'
-          : 'Gap Analysis Overview';
+          : view === 'stoploss'
+            ? 'Stop-Loss Research'
+            : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

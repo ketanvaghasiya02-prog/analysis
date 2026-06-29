@@ -43,8 +43,17 @@ import {
   DEFAULT_RECOVERY_SETTINGS,
   type RecoverySettings,
 } from '@/utils/recovery';
+import {
+  DEFAULT_SL_SETTINGS,
+  type StopLossSettings,
+} from '@/utils/stoploss';
 
-export type AppView = 'overview' | 'events' | 'recovery' | 'mae';
+export type AppView =
+  | 'overview'
+  | 'events'
+  | 'recovery'
+  | 'mae'
+  | 'stoploss';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
@@ -69,6 +78,9 @@ interface DataContextValue {
   // Recovery analysis settings (Phase R5).
   recoverySettings: RecoverySettings;
 
+  // Stop-loss research settings (Phase R7).
+  slSettings: StopLossSettings;
+
   // Navigation.
   view: AppView;
 
@@ -90,6 +102,9 @@ interface DataContextValue {
   updateRecoverySettings: (patch: Partial<RecoverySettings>) => void;
   resetRecoverySettings: () => void;
 
+  updateSlSettings: (patch: Partial<StopLossSettings>) => void;
+  resetSlSettings: () => void;
+
   setView: (view: AppView) => void;
 }
 
@@ -110,6 +125,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [recoverySettings, setRecoverySettings] = useState<RecoverySettings>(
     DEFAULT_RECOVERY_SETTINGS,
+  );
+  const [slSettings, setSlSettings] = useState<StopLossSettings>(
+    DEFAULT_SL_SETTINGS,
   );
   const [view, setView] = useState<AppView>('overview');
 
@@ -145,7 +163,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setGapBinSizeState(DEFAULT_BIN_SIZE);
     setSelectedZoneId(null);
     setRecoverySettings(DEFAULT_RECOVERY_SETTINGS);
+    setSlSettings(DEFAULT_SL_SETTINGS);
     setView('overview');
+  }, []);
+
+  const updateSlSettings = useCallback((patch: Partial<StopLossSettings>) => {
+    setSlSettings((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const resetSlSettings = useCallback(() => {
+    setSlSettings(DEFAULT_SL_SETTINGS);
   }, []);
 
   const updateRecoverySettings = useCallback(
@@ -279,6 +306,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       selectedZone,
       events,
       recoverySettings,
+      slSettings,
       view,
       addFiles,
       reset,
@@ -293,6 +321,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       toggleZone,
       updateRecoverySettings,
       resetRecoverySettings,
+      updateSlSettings,
+      resetSlSettings,
       setView,
     }),
     [
@@ -310,6 +340,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       selectedZone,
       events,
       recoverySettings,
+      slSettings,
       view,
       addFiles,
       reset,
@@ -324,6 +355,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       toggleZone,
       updateRecoverySettings,
       resetRecoverySettings,
+      updateSlSettings,
+      resetSlSettings,
     ],
   );
 

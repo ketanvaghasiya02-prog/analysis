@@ -13,6 +13,7 @@ import { OverviewView } from '@/pages/OverviewView';
 import { EventsView } from '@/components/events/EventsView';
 import { RecoveryView } from '@/components/recovery/RecoveryView';
 import { MaeView } from '@/components/mae/MaeView';
+import { StopLossView } from '@/components/stoploss/StopLossView';
 
 export function Dashboard() {
   const { hasData, view } = useData();
@@ -35,6 +36,8 @@ export function Dashboard() {
         <RecoveryView />
       ) : view === 'mae' ? (
         <MaeView />
+      ) : view === 'stoploss' ? (
+        <StopLossView />
       ) : (
         <OverviewView />
       )}
