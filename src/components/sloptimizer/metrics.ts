@@ -28,6 +28,32 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
     'Research confidence in this row, based on the number of historical positions.',
 };
 
+/** Intelligence Layer (Phase 10C) tooltips — observations, never advice. */
+export const INTEL_TOOLTIPS: Record<string, string> = {
+  balanced:
+    'Historical point where increasing the stop-loss produced very little additional recovery.',
+  plateau:
+    'Historical area where recovery remained nearly unchanged despite an increasing stop-loss.',
+  plateauStart:
+    'The stop-loss at which the historical recovery plateau begins.',
+  recoveryGain:
+    'Change in recovery-before-SL compared with the previous stop-loss step.',
+  riskIncrease:
+    'Additional stop-loss risk (gap points) compared with the previous stop-loss step.',
+  efficiency:
+    'Recovery gain divided by additional risk — recovery gained per extra point of stop-loss.',
+  largestGain:
+    'Stop-loss step with the largest single historical recovery gain.',
+  highestEfficiency:
+    'Stop-loss step that historically gained the most recovery per point of added risk.',
+  highestRecovery:
+    'Stop-loss with the highest historical recovery-before-SL.',
+  lowestSlHit:
+    'Stop-loss with the lowest historical stop-loss hit rate.',
+  balancedZone:
+    'Stop-losses at or above the historically balanced point, where extra recovery is marginal.',
+};
+
 /** Chart series palette (kept consistent across all optimizer charts). */
 export const SERIES_COLORS = {
   recoveryBefore: '#34d399',

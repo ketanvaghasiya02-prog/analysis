@@ -22,6 +22,10 @@ import { SlOptimizerValidation } from '@/components/sloptimizer/SlOptimizerValid
 import { SlOptimizerCharts } from '@/components/sloptimizer/SlOptimizerCharts';
 import { SlOptimizerSummary } from '@/components/sloptimizer/SlOptimizerSummary';
 import { SlOptimizerInsights } from '@/components/sloptimizer/SlOptimizerInsights';
+import { SlIntelligenceSummary } from '@/components/sloptimizer/SlIntelligenceSummary';
+import { SlIntelligencePanel } from '@/components/sloptimizer/SlIntelligencePanel';
+import { SlIntelligenceTable } from '@/components/sloptimizer/SlIntelligenceTable';
+import { buildSlIntelligence } from '@/utils/slIntelligence';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { fmtNumber, fmtPercent } from '@/utils/format';
 import { AlertIcon } from '@/components/common/icons';
@@ -70,6 +74,10 @@ export function SlOptimizerView() {
     () => runSlOptimizer(filteredSamples, deferredInput),
     [filteredSamples, deferredInput],
   );
+
+  // Intelligence Layer (Phase 10C): pure analysis of the already-computed
+  // optimizer result — no metric is recalculated.
+  const intel = useMemo(() => buildSlIntelligence(result), [result]);
 
   const positions = result.rows[0]?.totalPositions ?? 0;
 
@@ -211,6 +219,18 @@ export function SlOptimizerView() {
 
       <SlOptimizerTable result={result} />
       <SlOptimizerCharts result={result} />
+
+      {/* Intelligence Layer (Phase 10C) — historical observations only */}
+      <div className="flex items-center gap-3 pt-1">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">
+          Intelligence Layer
+        </h2>
+        <span className="h-px flex-1 bg-panel-border" />
+        <span className="text-[11px] text-ink-faint">explains the optimizer history</span>
+      </div>
+      <SlIntelligenceSummary intel={intel} />
+      <SlIntelligencePanel intel={intel} result={result} stamp={stamp} />
+      <SlIntelligenceTable intel={intel} />
     </div>
   );
 }
