@@ -15,6 +15,7 @@ import {
   ShieldIcon,
   TableIcon,
   TrashIcon,
+  WarningIcon,
 } from '@/components/common/icons';
 import type { AppView } from '@/context/DataContext';
 
@@ -38,6 +39,7 @@ export function Sidebar() {
     { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
     { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
     { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
+    { id: 'failed', label: 'Failed Events', icon: WarningIcon },
   ];
 
   return (

@@ -120,6 +120,16 @@ export function ShieldIcon(props: IconProps) {
   );
 }
 
+export function WarningIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5" />
+      <path d="M12 16h.01" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

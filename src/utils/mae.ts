@@ -91,7 +91,7 @@ export function computeMaeStats(events: EventMae[]): MaeStats {
 }
 
 /** Computes the MAE of a single event by scanning forward to recovery/boundary. */
-function maeForEvent(
+export function computeEventMae(
   samples: GapSample[],
   event: ZoneEvent,
   zoneLow: number,
@@ -152,7 +152,7 @@ export function buildMaeAnalysis(
     const failed: EventMae[] = [];
 
     for (const event of zoneEvents) {
-      const mae = maeForEvent(samples, event, zone.low);
+      const mae = computeEventMae(samples, event, zone.low);
       if (mae.recovered) recovered.push(mae);
       else failed.push(mae);
     }

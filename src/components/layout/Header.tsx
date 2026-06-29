@@ -29,7 +29,9 @@ export function Header() {
           ? 'MAE Analysis'
           : view === 'stoploss'
             ? 'Stop-Loss Research'
-            : 'Gap Analysis Overview';
+            : view === 'failed'
+              ? 'Failed Recovery Analysis'
+              : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

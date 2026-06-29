@@ -53,7 +53,8 @@ export type AppView =
   | 'events'
   | 'recovery'
   | 'mae'
-  | 'stoploss';
+  | 'stoploss'
+  | 'failed';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
