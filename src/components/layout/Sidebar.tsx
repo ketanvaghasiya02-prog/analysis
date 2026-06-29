@@ -9,6 +9,7 @@ import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
   FileIcon,
+  GaugeIcon,
   LayersIcon,
   RecoveryIcon,
   TableIcon,
@@ -34,6 +35,7 @@ export function Sidebar() {
       badge: hasData ? fmtInt(events.events.length) : undefined,
     },
     { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
+    { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
   ];
 
   return (

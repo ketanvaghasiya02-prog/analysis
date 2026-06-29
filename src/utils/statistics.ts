@@ -52,6 +52,28 @@ export function summarise(values: Array<number | null>): NumericSummary {
   return { count: nums.length, mean, min, max, stdDev, median };
 }
 
+/**
+ * Linear-interpolation percentile (type-7, numpy default) for p in 0–100.
+ * Returns null for an empty input.
+ */
+export function percentile(
+  values: Array<number | null>,
+  p: number,
+): number | null {
+  const a = values
+    .filter((v): v is number => v !== null && Number.isFinite(v))
+    .sort((x, y) => x - y);
+  if (a.length === 0) return null;
+  if (a.length === 1) return a[0] as number;
+  const rank = (p / 100) * (a.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  const loVal = a[lo] as number;
+  if (lo === hi) return loVal;
+  const hiVal = a[hi] as number;
+  return loVal + (hiVal - loVal) * (rank - lo);
+}
+
 /** Convenience: summary of the `gap` field across samples. */
 export function gapSummary(samples: GapSample[]): NumericSummary {
   return summarise(samples.map((s) => s.gap));

@@ -44,7 +44,7 @@ import {
   type RecoverySettings,
 } from '@/utils/recovery';
 
-export type AppView = 'overview' | 'events' | 'recovery';
+export type AppView = 'overview' | 'events' | 'recovery' | 'mae';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;

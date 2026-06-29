@@ -101,6 +101,16 @@ export function RecoveryIcon(props: IconProps) {
   );
 }
 
+export function GaugeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 13l4-4" />
+      <path d="M4.5 18a9 9 0 1 1 15 0" />
+      <circle cx="12" cy="13" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

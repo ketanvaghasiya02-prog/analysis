@@ -12,6 +12,7 @@ import { FileUpload } from '@/components/upload/FileUpload';
 import { OverviewView } from '@/pages/OverviewView';
 import { EventsView } from '@/components/events/EventsView';
 import { RecoveryView } from '@/components/recovery/RecoveryView';
+import { MaeView } from '@/components/mae/MaeView';
 
 export function Dashboard() {
   const { hasData, view } = useData();
@@ -32,6 +33,8 @@ export function Dashboard() {
         <EventsView />
       ) : view === 'recovery' ? (
         <RecoveryView />
+      ) : view === 'mae' ? (
+        <MaeView />
       ) : (
         <OverviewView />
       )}

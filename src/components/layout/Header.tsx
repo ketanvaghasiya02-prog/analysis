@@ -25,7 +25,9 @@ export function Header() {
       ? 'Zone Event Analysis'
       : view === 'recovery'
         ? 'Recovery Matrix'
-        : 'Gap Analysis Overview';
+        : view === 'mae'
+          ? 'MAE Analysis'
+          : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =
