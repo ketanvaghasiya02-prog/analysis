@@ -15,11 +15,16 @@ import type { SerializedExport } from '@/utils/reports';
 
 const EPS = 1e-9;
 
+/**
+ * Exact-touch scenario model. The user names a single Entry Gap, a single
+ * Recovery Gap and a single Stop-Loss Gap; events are detected on first touch.
+ */
 export interface ScenarioInput {
-  entryFrom: number;
-  entryTo: number;
-  recoveryFrom: number;
-  recoveryTo: number;
+  /** Entry triggers on the first touch of this gap level from below. */
+  entryGap: number;
+  /** Recovery triggers when gap first touches at or below this level. */
+  recoveryGap: number;
+  /** Stop-loss triggers when gap first touches at or above this level. */
   stopLoss: number;
   /** Optional cap on holding time, in minutes. */
   maxHoldingMinutes: number | null;
@@ -30,10 +35,8 @@ export interface ScenarioInput {
 }
 
 export const DEFAULT_SCENARIO_INPUT: ScenarioInput = {
-  entryFrom: 18.0,
-  entryTo: 18.5,
-  recoveryFrom: 15.0,
-  recoveryTo: 15.5,
+  entryGap: 18.0,
+  recoveryGap: 15.5,
   stopLoss: 19.0,
   maxHoldingMinutes: null,
   sameDayOnly: true,
@@ -107,7 +110,20 @@ export interface DistributionStats {
   worst: number | null;
 }
 
-export type ConfidenceLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type ConfidenceLevel =
+  | 'VERY_LOW'
+  | 'LOW'
+  | 'MEDIUM'
+  | 'HIGH'
+  | 'VERY_HIGH';
+
+export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
+  VERY_LOW: 'Very Low',
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  VERY_HIGH: 'Very High',
+};
 
 export interface ScenarioConfidence {
   level: ConfidenceLevel;
@@ -203,9 +219,8 @@ export function computeScenario(
   input: ScenarioInput,
 ): ScenarioResult {
   const {
-    entryFrom,
-    entryTo,
-    recoveryTo,
+    entryGap: entryLevel,
+    recoveryGap,
     stopLoss,
     maxHoldingMinutes,
     sameDayOnly,
@@ -230,11 +245,10 @@ export function computeScenario(
     const cur = samples[i]!;
     if (prev.gap === null || cur.gap === null) continue;
 
-    // Entry: cross into the entry zone from below entryFrom, landing in zone.
-    const isEntry =
-      prev.gap < entryFrom &&
-      cur.gap >= entryFrom - EPS &&
-      cur.gap <= entryTo + EPS;
+    // Entry: FIRST TOUCH of the entry gap from below. A new entry is only
+    // possible after the gap has fallen back below the level (prev < entryLevel),
+    // which prevents duplicate entries while the gap stays at/above it.
+    const isEntry = prev.gap < entryLevel && cur.gap >= entryLevel - EPS;
     if (!isEntry) continue;
 
     totalEvents += 1;
@@ -280,7 +294,7 @@ export function computeScenario(
       if (s.gap < minGap) minGap = s.gap;
       if (firstSlHitSec === null && s.gap >= stopLoss - EPS) firstSlHitSec = tsec;
 
-      if (s.gap <= recoveryTo + EPS) {
+      if (s.gap <= recoveryGap + EPS) {
         recovered = true;
         recoveryIndex = j;
         recoveryTimeSec = tsec;
@@ -379,27 +393,35 @@ function summariseScenario(
 
   let riskReward: ScenarioResult['riskReward'] = null;
   if (entryGapAvg !== null) {
-    const reward = entryGapAvg - input.recoveryTo;
+    const reward = entryGapAvg - input.recoveryGap;
     const risk = input.stopLoss - entryGapAvg;
     riskReward = { reward, risk, rr: risk > EPS ? reward / risk : null };
   }
 
-  // Confidence factors.
+  // Confidence factors: sample size, date coverage, sync quality, completeness.
   const daysCovered = new Set(events.map((e) => e.date)).size;
   const syncedEntries = events.filter((e) => isSynced(e.syncStatus)).length;
   const syncQualityPct = valid > 0 ? (syncedEntries / valid) * 100 : null;
   const unresolvedPct = pct(unresolved);
+  const resolvedPct = 100 - unresolvedPct;
 
-  const eventsScore =
-    valid >= 100 ? 1 : valid >= 30 ? 0.6 : valid >= input.minEvents ? 0.3 : 0;
+  const sizeScore =
+    valid >= 200 ? 1 : valid >= 100 ? 0.8 : valid >= 50 ? 0.6 : valid >= input.minEvents ? 0.3 : 0;
+  const coverageScore = daysCovered >= 10 ? 1 : daysCovered >= 5 ? 0.8 : daysCovered >= 2 ? 0.5 : 0.3;
   const syncScore =
-    syncQualityPct === null ? 0.3 : syncQualityPct >= 98 ? 1 : syncQualityPct >= 90 ? 0.6 : 0.2;
-  const unresolvedScore =
-    unresolvedPct <= 10 ? 1 : unresolvedPct <= 30 ? 0.6 : 0.2;
-  const coverageScore = daysCovered >= 5 ? 1 : daysCovered >= 2 ? 0.6 : 0.3;
-  const score = (eventsScore + syncScore + unresolvedScore + coverageScore) / 4;
-  const level: ConfidenceLevel =
-    score >= 0.7 ? 'HIGH' : score >= 0.45 ? 'MEDIUM' : 'LOW';
+    syncQualityPct === null ? 0.3 : syncQualityPct >= 98 ? 1 : syncQualityPct >= 90 ? 0.6 : 0.3;
+  const completenessScore =
+    resolvedPct >= 95 ? 1 : resolvedPct >= 80 ? 0.7 : resolvedPct >= 50 ? 0.4 : 0.2;
+  const score = (sizeScore + coverageScore + syncScore + completenessScore) / 4;
+
+  // Map score to a 5-level scale, then cap by sample size so a tiny sample can
+  // never read as High/Very High.
+  const order: ConfidenceLevel[] = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
+  const baseIdx =
+    score >= 0.85 ? 4 : score >= 0.65 ? 3 : score >= 0.45 ? 2 : score >= 0.25 ? 1 : 0;
+  const capIdx =
+    valid >= 200 ? 4 : valid >= 100 ? 3 : valid >= 50 ? 2 : valid >= 20 ? 1 : 0;
+  const level: ConfidenceLevel = order[Math.min(baseIdx, capIdx)]!;
 
   // `samples` retained for signature symmetry / potential future coverage use.
   void samples;
@@ -464,8 +486,8 @@ export function computeSensitivity(
   const notRecoveredCount = valid - recoveredCount;
 
   const rows: SensitivityRow[] = [];
-  const start = input.entryTo;
-  const end = input.entryTo + 6;
+  const start = input.entryGap;
+  const end = input.entryGap + 6;
   for (let sl = start; sl <= end + EPS; sl = Math.round((sl + 0.5) * 1e6) / 1e6) {
     let recoveredWithout = 0;
     let slHit = 0;

@@ -112,11 +112,10 @@ export function ScenarioPathChart({
                 formatter={(val: number) => [fmtNumber(val, 3), 'Gap']}
               />
 
-              {/* Reference lines */}
+              {/* Reference lines: stop-loss, entry, recovery */}
               <ReferenceLine y={input.stopLoss} stroke="#fbbf24" strokeDasharray="5 4" strokeWidth={1.5} />
-              <ReferenceLine y={input.entryTo} stroke="#38bdf8" strokeDasharray="2 3" />
-              <ReferenceLine y={input.entryFrom} stroke="#38bdf8" strokeDasharray="2 3" />
-              <ReferenceLine y={input.recoveryTo} stroke="#34d399" strokeDasharray="5 4" strokeWidth={1.5} />
+              <ReferenceLine y={input.entryGap} stroke="#38bdf8" strokeDasharray="2 3" strokeWidth={1.5} />
+              <ReferenceLine y={input.recoveryGap} stroke="#34d399" strokeDasharray="5 4" strokeWidth={1.5} />
 
               <Line
                 type="monotone"

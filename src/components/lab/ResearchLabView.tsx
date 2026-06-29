@@ -113,14 +113,14 @@ export function ResearchLabView() {
       `Only ${result.validEvents} valid events — below the minimum of ${input.minEvents}. Results are low-confidence.`,
     );
   }
-  if (input.stopLoss <= input.entryTo) {
+  if (input.stopLoss <= input.entryGap) {
     warnings.push(
-      'Stop-loss gap is at or below the entry zone top. A stop should sit above the entry zone.',
+      'Stop-Loss Gap is at or below the Entry Gap. A stop should sit above the entry level.',
     );
   }
-  if (input.recoveryTo >= input.entryFrom) {
+  if (input.recoveryGap >= input.entryGap) {
     warnings.push(
-      'Recovery target top is at or above the entry zone bottom. The recovery target should sit below the entry zone.',
+      'Recovery Gap is at or above the Entry Gap. The recovery target should sit below the entry level.',
     );
   }
 
@@ -273,10 +273,8 @@ export function ResearchLabView() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
-          <NumField label="Entry Gap From" value={input.entryFrom} step={0.1} onChange={(entryFrom) => patch({ entryFrom })} />
-          <NumField label="Entry Gap To" value={input.entryTo} step={0.1} onChange={(entryTo) => patch({ entryTo })} />
-          <NumField label="Recovery Target From" value={input.recoveryFrom} step={0.1} onChange={(recoveryFrom) => patch({ recoveryFrom })} />
-          <NumField label="Recovery Target To" value={input.recoveryTo} step={0.1} onChange={(recoveryTo) => patch({ recoveryTo })} />
+          <NumField label="Entry Gap" value={input.entryGap} step={0.1} onChange={(entryGap) => patch({ entryGap })} />
+          <NumField label="Recovery Gap" value={input.recoveryGap} step={0.1} onChange={(recoveryGap) => patch({ recoveryGap })} />
           <NumField label="Stop Loss Gap" value={input.stopLoss} step={0.1} onChange={(stopLoss) => patch({ stopLoss })} />
           <label className="flex flex-col gap-1">
             <span className="stat-label">Max Holding (min)</span>
@@ -444,7 +442,7 @@ export function ResearchLabView() {
       {/* Top Trade Finder — uses the same active Research Lab dataset. */}
       <TopTradeFinder
         samples={labSamples}
-        recoveryTargetTo={input.recoveryTo}
+        recoveryTargetTo={input.recoveryGap}
         slLevel={input.stopLoss}
         sessionOptions={sessionOptions}
       />

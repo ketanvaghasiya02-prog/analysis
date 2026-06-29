@@ -6,15 +6,21 @@
  * example).
  */
 
-import type { ScenarioResult } from '@/utils/scenario';
+import {
+  CONFIDENCE_LABELS,
+  type ConfidenceLevel,
+  type ScenarioResult,
+} from '@/utils/scenario';
 import { fmtDuration, fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
 import { InfoTip } from '@/components/common/InfoTip';
 
-const CONF_TONE = {
+const CONF_TONE: Record<ConfidenceLevel, string> = {
+  VERY_HIGH: 'text-positive',
   HIGH: 'text-positive',
   MEDIUM: 'text-warning',
   LOW: 'text-negative',
-} as const;
+  VERY_LOW: 'text-negative',
+};
 
 function Card({
   label,
@@ -44,16 +50,36 @@ function Card({
 export function ScenarioCards({ result }: { result: ScenarioResult }) {
   const rr = result.riskReward;
 
+  const input = result.input;
+
   return (
     <>
-      {/* Primary outcome metrics — always show all six, including unresolved. */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      {/* Scenario parameters. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card
+          label="Entry Gap"
+          value={fmtNumber(input.entryGap, 2)}
+          tone="text-accent"
+          tooltip="The exact gap level. An event starts on the first touch of this level from below."
+        />
+        <Card
+          label="Recovery Gap"
+          value={fmtNumber(input.recoveryGap, 2)}
+          tone="text-positive"
+          tooltip="Recovery is the first time the gap touches at or below this level after entry."
+        />
+        <Card
+          label="Stop Loss Gap"
+          value={fmtNumber(input.stopLoss, 2)}
+          tone="text-negative"
+          tooltip="Stop-loss is the first time the gap touches at or above this level after entry."
+        />
         <Card
           label="Total Events"
           value={fmtInt(result.validEvents)}
           tooltip={
-            'Definition: every entry-zone event that was analysed (passing session/sync filters).\n' +
-            'Formula: count of detected entries that were classified.\n' +
+            'Definition: every entry event that was analysed (passing session/sync filters).\n' +
+            'Formula: count of detected first-touch entries that were classified.\n' +
             (result.totalEvents !== result.validEvents
               ? `Note: ${result.totalEvents} detected, ${result.validEvents} analysed after filters.`
               : 'Each event gets exactly one final outcome.')
@@ -64,6 +90,10 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
               : undefined
           }
         />
+      </section>
+
+      {/* Primary outcome metrics — always show all, including unresolved. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <Card
           label="Recovery Before SL %"
           value={fmtPercent(result.recoveryBeforeSlPct)}
@@ -116,15 +146,35 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
         />
       </section>
 
-      {/* Secondary analytics. */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      {/* Recovery-time + adverse-gap distribution. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Card
           label="Avg Recovery Time"
           value={fmtDuration(result.avgRecoveryTimeSec)}
           tooltip={
-            'Definition: average time from entry to reaching the recovery target.\n' +
+            'Definition: average time from entry to reaching the recovery gap.\n' +
             'Formula: mean of recovery times over recovered events.'
           }
+        />
+        <Card
+          label="Median Recovery Time"
+          value={fmtDuration(result.medianRecoveryTimeSec)}
+          tooltip="Middle recovery time (50th percentile) over recovered events."
+        />
+        <Card
+          label="Avg Max Adverse Gap"
+          value={fmtNumber(result.adverse.avg, 3)}
+          tooltip="Average of the highest gap reached after entry, across events."
+        />
+        <Card
+          label="Median Max Adverse Gap"
+          value={fmtNumber(result.adverse.median, 3)}
+          tooltip="Median of the highest gap reached after entry."
+        />
+        <Card
+          label="P90 Max Adverse Gap"
+          value={fmtNumber(result.adverse.p90, 3)}
+          tooltip="90th percentile of the highest gap reached after entry."
         />
         <Card
           label="P95 Max Adverse Gap"
@@ -132,12 +182,16 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
           tone="text-accent"
           tooltip={
             'Definition: 95th percentile of the highest gap reached after entry.\n' +
-            'Formula: P95 of max-gap-after-entry across events.\n' +
             'Use: a stop below this would have been hit ~5% of the time.'
           }
         />
         <Card
-          label="Worst Max Gap"
+          label="P99 Max Adverse Gap"
+          value={fmtNumber(result.adverse.p99, 3)}
+          tooltip="99th percentile of the highest gap reached after entry."
+        />
+        <Card
+          label="Worst Max Adverse Gap"
           value={fmtNumber(result.adverse.worst, 3)}
           tone="text-negative"
           tooltip={
@@ -150,7 +204,7 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
           value={rr && rr.rr !== null ? fmtNumber(rr.rr, 2) : '—'}
           tooltip={
             'Definition: gap-point reward vs risk for this scenario (not money).\n' +
-            'Formula: Reward = Avg Entry Gap − Recovery Target To; Risk = Stop Loss − Avg Entry Gap; RR = Reward / Risk.\n' +
+            'Formula: Reward = Avg Entry Gap − Recovery Gap; Risk = Stop Loss − Avg Entry Gap; RR = Reward / Risk.\n' +
             'Example: entry 18.20, recovery 15.50, SL 19.00 → reward 2.70 / risk 0.80 → 3.38.'
           }
           hint={
@@ -161,12 +215,12 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
         />
         <Card
           label="Research Confidence"
-          value={result.confidence.level}
+          value={CONFIDENCE_LABELS[result.confidence.level]}
           tone={CONF_TONE[result.confidence.level]}
           tooltip={
             'Definition: how trustworthy these stats are (not a measure of profitability).\n' +
-            'Based on: number of events, sync quality, unresolved %, and day coverage.\n' +
-            'Shown as LOW / MEDIUM / HIGH.'
+            'Based on: sample size, date coverage, sync quality, and outcome completeness.\n' +
+            'Shown as Very Low / Low / Medium / High / Very High. Few events can never read High.'
           }
           hint={`score ${fmtNumber(result.confidence.score * 100, 0)} / 100`}
         />

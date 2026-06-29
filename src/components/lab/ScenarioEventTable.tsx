@@ -61,7 +61,7 @@ export function ScenarioEventTable({
         cell: (c) => fmtNumber(c.getValue() as number, 3),
       },
       {
-        header: 'Max Gap',
+        header: 'Max Gap After Entry',
         accessorKey: 'maxGap',
         cell: (c) => (
           <span className="text-negative">
@@ -70,7 +70,7 @@ export function ScenarioEventTable({
         ),
       },
       {
-        header: 'Min Gap',
+        header: 'Min Gap After Entry',
         accessorKey: 'minGap',
         cell: (c) => (
           <span className="text-positive">
@@ -79,25 +79,14 @@ export function ScenarioEventTable({
         ),
       },
       {
-        header: 'SL Hit',
-        accessorKey: 'slHit',
-        cell: (c) => {
-          const v = c.getValue() as boolean;
-          return <span className={v ? 'text-negative' : 'text-ink-faint'}>{v ? 'Yes' : 'No'}</span>;
-        },
-      },
-      {
-        header: 'SL Hit Time',
-        accessorKey: 'slHitTimeSec',
-        cell: (c) => fmtDuration(c.getValue() as number | null),
-      },
-      {
-        header: 'Recovery Hit',
-        accessorKey: 'recoveryHit',
-        cell: (c) => {
-          const v = c.getValue() as boolean;
-          return <span className={v ? 'text-positive' : 'text-ink-faint'}>{v ? 'Yes' : 'No'}</span>;
-        },
+        id: 'maxAdverse',
+        header: 'Max Adverse Gap',
+        accessorFn: (e) => e.maxGap - e.entryGap,
+        cell: (c) => (
+          <span className="text-warning">
+            {fmtNumber(c.getValue() as number, 3)}
+          </span>
+        ),
       },
       {
         header: 'Recovery Time',
@@ -105,17 +94,22 @@ export function ScenarioEventTable({
         cell: (c) => fmtDuration(c.getValue() as number | null),
       },
       {
-        header: 'Final Outcome',
+        header: 'SL Time',
+        accessorKey: 'slHitTimeSec',
+        cell: (c) => fmtDuration(c.getValue() as number | null),
+      },
+      {
+        header: 'Holding Time',
+        accessorKey: 'durationSec',
+        cell: (c) => fmtDuration(c.getValue() as number | null),
+      },
+      {
+        header: 'Outcome',
         accessorKey: 'outcome',
         cell: (c) => {
           const o = c.getValue() as ScenarioOutcome;
           return <span className={OUTCOME_TONE[o]}>{OUTCOME_LABELS[o]}</span>;
         },
-      },
-      {
-        header: 'Duration',
-        accessorKey: 'durationSec',
-        cell: (c) => fmtDuration(c.getValue() as number | null),
       },
       { header: 'Session', accessorKey: 'session' },
       {

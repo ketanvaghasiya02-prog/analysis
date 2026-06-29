@@ -34,7 +34,7 @@ export function ScenarioHelpPanel() {
         className="flex w-full items-center justify-between px-5 py-3 text-left"
       >
         <span className="text-sm font-semibold uppercase tracking-wide text-ink">
-          How calculations work
+          How Research Works
         </span>
         <span className="text-ink-faint">{open ? '▲' : '▼'}</span>
       </button>
@@ -42,49 +42,43 @@ export function ScenarioHelpPanel() {
       {open && (
         <div className="border-t border-panel-border px-5 py-4 text-sm text-ink-muted">
           <p className="text-xs text-ink-faint">
-            This explains what each metric means. It is research education, not a
-            trading signal. No buy/sell orders are generated.
+            Exact-touch model: an event starts on the first touch of the Entry
+            Gap from below; after entry, every future sample is scanned in
+            chronological order and the FIRST of recovery or stop-loss decides
+            the path. Research education only — not a trading signal.
           </p>
 
           <H>Worked examples</H>
           <p className="mt-1">
-            Scenario: Entry Gap Zone = 18.00–18.50, Recovery Target To = 15.50,
-            Stop Loss Gap = 19.00.
+            Scenario: Entry Gap = 18.00, Recovery Gap = 15.50, Stop Loss = 21.00.
           </p>
-          <Code>{`Event-1  entry 18.20
-  path: 18.20 → 18.10 → 17.30 → 15.50
-  recovery reached before SL  →  RECOVERED_BEFORE_SL
+          <Code>{`Example 1  (SL hit, then recovered)
+  entry on first touch of 18.00 (gap 18.02)
+  path: 18.02 → 20.40 → 21.00 (SL HIT) → 17.20 → 15.50 (recovered)
+  SL happened first, recovery happened later
+  →  RECOVERED_AFTER_SL
 
-Event-2  entry 18.30
-  path: 18.30 → 18.80 → 19.10 → 18.50 → 15.50
-  SL hit first at 19.00, recovery later at 15.50  →  SL_HIT_THEN_RECOVERED
-
-Event-3  entry 18.10
-  path: 18.10 → 18.70 → 19.20 → 20.10 → 20.80
-  SL hit, recovery never happened  →  SL_HIT_NOT_RECOVERED
-
-Event-4  entry 18.40
-  path: 18.40 → 18.10 → 17.60 → 16.30 (day ends before 15.50)
-  →  DAY_END_NO_RESOLUTION`}</Code>
+Example 2  (recovered cleanly)
+  entry on first touch of 18.00
+  path: 18.00 → 17.60 → 16.20 → 15.50 (recovered)
+  recovery reached, SL never touched
+  →  RECOVERED_BEFORE_SL`}</Code>
 
           <H>Formulas</H>
-          <Code>{`Total Events            = all detected entry-zone events
+          <Code>{`Total Events            = all detected first-touch entry events
 Recovery Before SL %    = Recovered Before SL / Total × 100
-Recovery After SL %     = SL Hit Then Recovered / Total × 100
-Recovery Ignoring SL %  = (Recovered Before SL + SL Hit Then Recovered) / Total × 100
-SL Hit %                = (SL Hit Then Recovered + SL Hit Not Recovered) / Total × 100
-Unresolved %            = (Day End + Dataset End + Max Holding Expired) / Total × 100
-
-Recovered Events Stopped By SL = SL Hit Then Recovered
-  → events where the idea eventually worked, but the SL was too tight.`}</Code>
+Recovery After SL %     = Recovered After SL / Total × 100
+Recovery Ignoring SL %  = (Recovered Before SL + Recovered After SL) / Total × 100
+SL Hit %                = (Recovered After SL + SL Not Recovered) / Total × 100
+Unresolved %            = (Day End + Dataset End + Holding Expired) / Total × 100`}</Code>
 
           <H>Numeric example (Total Events = 100)</H>
           <Code>{`Recovered Before SL    = 62
-SL Hit Then Recovered  = 25
-SL Hit Not Recovered   = 8
-Day End No Resolution  = 3
-Dataset End No Res.    = 2
-Max Holding Expired    = 0
+Recovered After SL     = 25
+SL Not Recovered       = 8
+Day End                = 3
+Dataset End            = 2
+Holding Time Expired   = 0
 
 Recovery Before SL %    = 62 / 100 = 62%
 Recovery After SL %     = 25 / 100 = 25%
