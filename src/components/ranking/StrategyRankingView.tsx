@@ -11,7 +11,9 @@
  */
 
 import { Fragment, useMemo, useState } from 'react';
+import { useData } from '@/context/DataContext';
 import { useRepository } from '@/context/RepositoryContext';
+import { useStrategyFocus } from '@/context/StrategyFocusContext';
 import {
   DEFAULT_RANKING_FILTERS,
   rankStrategies,
@@ -112,6 +114,8 @@ function HighlightCard({
 
 export function StrategyRankingView() {
   const { records } = useRepository();
+  const { setView } = useData();
+  const { setFocus } = useStrategyFocus();
   const [filters, setFilters] = useState<RankingFilters>(DEFAULT_RANKING_FILTERS);
   const [mode, setMode] = useState<RankingMode>('BALANCED');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -120,6 +124,12 @@ export function StrategyRankingView() {
 
   // Memoized ranking — only reruns when repository, filters or mode change.
   const result = useMemo(() => rankStrategies(records, filters, mode), [records, filters, mode]);
+
+  const modeLabel = RANKING_MODES.find((m) => m.mode === mode)?.label ?? null;
+  const openDossier = (s: RankedStrategy) => {
+    setFocus({ key: s.record.key, rank: s.rank, overall: s.scores.overall, modeLabel });
+    setView('strategy-details');
+  };
 
   const toggle = (key: string) =>
     setExpanded((prev) => {
@@ -285,7 +295,7 @@ export function StrategyRankingView() {
               <RankingCharts result={result} />
 
               {/* Ranking table */}
-              <RankingTable ranked={result.ranked} expanded={expanded} onToggle={toggle} />
+              <RankingTable ranked={result.ranked} expanded={expanded} onToggle={toggle} onOpen={openDossier} />
             </>
           )}
         </>
@@ -298,17 +308,19 @@ function RankingTable({
   ranked,
   expanded,
   onToggle,
+  onOpen,
 }: {
   ranked: RankedStrategy[];
   expanded: Set<string>;
   onToggle: (key: string) => void;
+  onOpen: (s: RankedStrategy) => void;
 }) {
   return (
     <section className="card overflow-hidden">
       <header className="flex items-center gap-2 border-b border-panel-border px-5 py-3">
         <TableIcon className="text-base text-accent" />
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Ranked Strategies</h2>
-        <span className="ml-auto text-xs text-ink-faint">{fmtInt(ranked.length)} ranked · click a row for the score breakdown</span>
+        <span className="ml-auto text-xs text-ink-faint">{fmtInt(ranked.length)} ranked · click a row for the score breakdown, Details for the full dossier</span>
       </header>
       <div className="max-h-[40rem] overflow-auto">
         <table className="w-full text-left text-sm">
@@ -327,6 +339,7 @@ function RankingTable({
               <th className="px-3 py-2 text-right font-medium">Worst Gap</th>
               <th className="px-3 py-2 font-medium">Confidence</th>
               <th className="px-3 py-2 text-right font-medium">Overall</th>
+              <th className="px-3 py-2 text-right font-medium">Dossier</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-panel-border font-mono text-xs">
@@ -358,10 +371,22 @@ function RankingTable({
                     <td className={['px-3 py-1.5 text-right font-semibold', scoreTone(s.scores.overall)].join(' ')}>
                       {fmtNumber(s.scores.overall, 1)}
                     </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpen(s);
+                        }}
+                        className="btn px-2 py-0.5 text-[11px]"
+                      >
+                        Details →
+                      </button>
+                    </td>
                   </tr>
                   {open && (
                     <tr className="bg-panel/20">
-                      <td colSpan={13} className="px-5 py-3">
+                      <td colSpan={14} className="px-5 py-3">
                         <div className="mb-2 stat-label">Score Breakdown</div>
                         <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
                           <ScoreBar label="Recovery Score" value={s.scores.recovery} />

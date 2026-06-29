@@ -17,10 +17,30 @@ import {
   CONFIDENCE_LABELS,
   type ConfidenceLevel,
   type ScenarioInput,
+  type ScenarioOutcome,
 } from '@/utils/scenario';
 import type { StrategyCombination } from '@/utils/strategyFinder';
 
 export type ExecStatus = 'READY' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CACHED';
+
+/**
+ * One historical occurrence of a strategy — a flattened view of a single
+ * ScenarioEvent already produced by the FROZEN Research Engine. Captured (not
+ * recomputed) so the read-only Strategy Dossier can show per-occurrence
+ * evidence without ever rerunning the engine.
+ */
+export interface OccurrenceRecord {
+  date: string;
+  time: string;
+  session: string;
+  entryGap: number;
+  maxGap: number;
+  minGap: number;
+  recoveryGap: number;
+  recoveryTimeSec: number | null;
+  holdingSec: number | null;
+  outcome: ScenarioOutcome;
+}
 
 /** The complete research result stored for every executed strategy. */
 export interface StrategyResearchResult {
@@ -48,6 +68,8 @@ export interface StrategyResearchResult {
   executionMs: number;
   /** Epoch ms when the result completed. */
   completedAt: number;
+  /** Per-occurrence evidence, captured from the engine's events (read-only). */
+  occurrences: OccurrenceRecord[];
 }
 
 /** One strategy's execution record (status + result), updated live. */
@@ -134,5 +156,19 @@ export function executeStrategy(
     confidenceLabel: CONFIDENCE_LABELS[r.confidence.level],
     executionMs: nowMs() - t0,
     completedAt: Date.now(),
+    // Capture (do not recompute) the engine's per-occurrence events so the
+    // read-only dossier has full evidence without rerunning the engine.
+    occurrences: r.events.map((e) => ({
+      date: e.date,
+      time: e.entryTime,
+      session: e.session,
+      entryGap: e.entryGap,
+      maxGap: e.maxGap,
+      minGap: e.minGap,
+      recoveryGap: c.recoveryGap,
+      recoveryTimeSec: e.recoveryTimeSec,
+      holdingSec: e.durationSec,
+      outcome: e.outcome,
+    })),
   };
 }

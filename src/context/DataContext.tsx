@@ -63,6 +63,7 @@ export type AppView =
   | 'strategy-finder'
   | 'repository'
   | 'ranking'
+  | 'strategy-details'
   | 'settings';
 
 interface DataContextValue {

@@ -46,9 +46,11 @@ export function Header() {
                           ? 'Research Repository'
                           : view === 'ranking'
                             ? 'Strategy Ranking'
-                            : view === 'settings'
-                              ? 'Settings'
-                              : 'Gap Analysis Overview';
+                            : view === 'strategy-details'
+                              ? 'Historical Strategy Details'
+                              : view === 'settings'
+                                ? 'Settings'
+                                : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

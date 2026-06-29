@@ -24,6 +24,7 @@ import { SlOptimizerView } from '@/components/sloptimizer/SlOptimizerView';
 import { StrategyFinderView } from '@/components/strategyfinder/StrategyFinderView';
 import { RepositoryView } from '@/components/repository/RepositoryView';
 import { StrategyRankingView } from '@/components/ranking/StrategyRankingView';
+import { StrategyDetailsView } from '@/components/details/StrategyDetailsView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -52,6 +53,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <StrategyRankingView />
+      </AppLayout>
+    );
+  }
+
+  // The Strategy Dossier reads stored results, so it is also dataset-independent.
+  if (view === 'strategy-details') {
+    return (
+      <AppLayout>
+        <StrategyDetailsView />
       </AppLayout>
     );
   }

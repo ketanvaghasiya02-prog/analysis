@@ -9,7 +9,7 @@
  */
 
 import type { ConfidenceLevel } from '@/utils/scenario';
-import type { StrategyResearchResult } from '@/utils/strategyExecution';
+import type { OccurrenceRecord, StrategyResearchResult } from '@/utils/strategyExecution';
 import type { SerializedExport } from '@/utils/reports';
 
 const CONFIDENCE_ORDER: ConfidenceLevel[] = [
@@ -52,6 +52,8 @@ export interface RepositoryRecord {
   dateFrom: string;
   dateTo: string;
   sessions: string[];
+  /** Per-occurrence evidence captured from the engine output (read-only). */
+  occurrences: OccurrenceRecord[];
 }
 
 /** What the Strategy Finder hands to the repository for one completed result. */
@@ -117,6 +119,7 @@ export function toRepositoryRecord(
     dateFrom: item.dateFrom,
     dateTo: item.dateTo,
     sessions: item.sessions,
+    occurrences: r.occurrences ?? [],
   };
 }
 
