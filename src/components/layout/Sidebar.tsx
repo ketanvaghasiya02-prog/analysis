@@ -14,6 +14,7 @@ import {
   LayersIcon,
   RecoveryIcon,
   ReplayIcon,
+  SettingsIcon,
   ShieldIcon,
   TableIcon,
   TrashIcon,
@@ -44,7 +45,10 @@ export function Sidebar() {
     { id: 'failed', label: 'Failed Events', icon: WarningIcon },
     { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
     { id: 'session', label: 'Session Analysis', icon: ClockIcon },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
+
+  const alwaysEnabled = new Set<AppView>(['overview', 'settings']);
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">
@@ -70,7 +74,7 @@ export function Sidebar() {
                 key={item.id}
                 type="button"
                 onClick={() => setView(item.id)}
-                disabled={!hasData && item.id !== 'overview'}
+                disabled={!hasData && !alwaysEnabled.has(item.id)}
                 className={[
                   'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   active

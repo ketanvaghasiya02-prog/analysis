@@ -136,24 +136,33 @@ function mapRow(
   return { sample };
 }
 
-/** Parses a single CSV file's text content. */
-export function parseCsvText(text: string, fileName: string): ParsedFile {
+/**
+ * Converts a PapaParse result into a typed ParsedFile. Header trimming is done
+ * here (rather than via transformHeader) so the same path works for the worker,
+ * which cannot receive a transformHeader function.
+ */
+function finalizeParse(
+  result: Papa.ParseResult<RawRow>,
+  fileName: string,
+): ParsedFile {
   const fileNameDate = extractDateFromFilename(fileName);
   const parseErrors: string[] = [];
 
-  const result = Papa.parse<RawRow>(text, {
-    header: true,
-    skipEmptyLines: 'greedy',
-    transformHeader: (h) => h.trim(),
-  });
-
   for (const err of result.errors) {
-    parseErrors.push(
-      `Row ${err.row ?? '?'}: ${err.code} — ${err.message}`,
-    );
+    parseErrors.push(`Row ${err.row ?? '?'}: ${err.code} — ${err.message}`);
   }
 
-  const headers = result.meta.fields ?? [];
+  const rawHeaders = result.meta.fields ?? [];
+  const headers = rawHeaders.map((h) => h.trim());
+  const needsRemap = headers.some((h, i) => h !== rawHeaders[i]);
+  const rows: RawRow[] = needsRemap
+    ? result.data.map((row) => {
+        const out: RawRow = {};
+        for (const key of Object.keys(row)) out[key.trim()] = row[key]!;
+        return out;
+      })
+    : result.data;
+
   const headerSet = new Set(headers);
   const missingColumns = EXPECTED_COLUMNS.filter(
     (c) => !headerSet.has(c),
@@ -164,7 +173,7 @@ export function parseCsvText(text: string, fileName: string): ParsedFile {
   const validSamples: GapSample[] = [];
   const invalidRows: InvalidRow[] = [];
 
-  result.data.forEach((row, idx) => {
+  rows.forEach((row, idx) => {
     const mapped = mapRow(row, idx, fileName, fileNameDate);
     if ('sample' in mapped) validSamples.push(mapped.sample);
     else invalidRows.push(mapped.invalid);
@@ -176,11 +185,44 @@ export function parseCsvText(text: string, fileName: string): ParsedFile {
     headers,
     missingColumns,
     unexpectedColumns,
-    totalRows: result.data.length,
+    totalRows: rows.length,
     validSamples,
     invalidRows,
     parseErrors,
   };
+}
+
+/** Parses a single CSV file's text content synchronously (main thread). */
+export function parseCsvText(text: string, fileName: string): ParsedFile {
+  const result = Papa.parse<RawRow>(text, {
+    header: true,
+    skipEmptyLines: 'greedy',
+  });
+  return finalizeParse(result, fileName);
+}
+
+/**
+ * Parses CSV text, offloading to a PapaParse web worker for large inputs so the
+ * main thread (and UI) stays responsive when many/large files are uploaded.
+ */
+const WORKER_THRESHOLD_BYTES = 1_000_000;
+
+export function parseCsvTextAsync(
+  text: string,
+  fileName: string,
+): Promise<ParsedFile> {
+  if (text.length < WORKER_THRESHOLD_BYTES) {
+    return Promise.resolve(parseCsvText(text, fileName));
+  }
+  return new Promise((resolve) => {
+    Papa.parse<RawRow>(text, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      worker: true,
+      complete: (result) => resolve(finalizeParse(result, fileName)),
+      error: () => resolve(parseCsvText(text, fileName)),
+    });
+  });
 }
 
 /** Reads a File object as text using the FileReader API. */
@@ -193,30 +235,51 @@ export function readFileAsText(file: File): Promise<string> {
   });
 }
 
-/** Parses many File objects and returns their individual ParsedFile results. */
-export async function parseFiles(files: File[]): Promise<ParsedFile[]> {
-  const parsed = await Promise.all(
-    files.map(async (file) => {
-      try {
-        const text = await readFileAsText(file);
-        return parseCsvText(text, file.name);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Unknown read error';
-        return {
-          fileName: file.name,
-          fileNameDate: extractDateFromFilename(file.name),
-          headers: [],
-          missingColumns: [...EXPECTED_COLUMNS],
-          unexpectedColumns: [],
-          totalRows: 0,
-          validSamples: [],
-          invalidRows: [],
-          parseErrors: [`Failed to read file: ${message}`],
-        } satisfies ParsedFile;
-      }
-    }),
+async function parseOneFile(file: File): Promise<ParsedFile> {
+  try {
+    const text = await readFileAsText(file);
+    return await parseCsvTextAsync(text, file.name);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown read error';
+    return {
+      fileName: file.name,
+      fileNameDate: extractDateFromFilename(file.name),
+      headers: [],
+      missingColumns: [...EXPECTED_COLUMNS],
+      unexpectedColumns: [],
+      totalRows: 0,
+      validSamples: [],
+      invalidRows: [],
+      parseErrors: [`Failed to read file: ${message}`],
+    } satisfies ParsedFile;
+  }
+}
+
+/**
+ * Parses many File objects with a bounded concurrency pool, so uploading 30+
+ * files spins up a handful of workers at a time instead of all at once.
+ */
+export async function parseFiles(
+  files: File[],
+  concurrency = 4,
+): Promise<ParsedFile[]> {
+  const results = new Array<ParsedFile>(files.length);
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (next < files.length) {
+      const index = next;
+      next += 1;
+      results[index] = await parseOneFile(files[index]!);
+    }
+  }
+
+  const pool = Array.from(
+    { length: Math.min(concurrency, files.length) },
+    () => worker(),
   );
-  return parsed;
+  await Promise.all(pool);
+  return results;
 }
 
 /**

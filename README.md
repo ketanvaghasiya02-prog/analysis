@@ -10,27 +10,37 @@ An institutional-style web application for **statistical research** on MT5
 
 ---
 
-## Phase R1 scope
+## Features
 
-This is the **R1** foundation release. It delivers:
+The app is organised as a multi-page research console (left-sidebar
+navigation). Every page reads one shared, filtered dataset, so the active
+**analysis mode** (Combined / Day Wise / Single Day / Custom Range) and the
+**global filters** (date range, session, SyncStatus, symbol pair, gap range)
+flow through everything consistently.
 
-1. **Multi-CSV upload** — drag-and-drop or browse one or many files at once
-   (e.g. `GapMonitor_Main_20260601.csv … GapMonitor_Main_20260610.csv`).
-2. **Parsing engine** — parses every file, merges into one combined dataset
-   while **preserving day-wise buckets**, extracts the date from both the
-   filename and `ServerTime`, and safely quarantines missing/corrupt rows.
-3. **Validation engine** — files uploaded, total/valid/invalid rows, missing
-   columns, duplicate timestamps, `SyncStatus` distribution and the detected
-   date range.
-4. **Dark institutional dashboard** — left sidebar, header with the active
-   date range, main content area, responsive layout.
-5. **Overview cards** — total files, total samples, date range, average/max/min
-   gap and sync-quality %.
-6. **Analysis mode selector** — Combined · Day Wise · Single Day · Custom Date
-   Range.
+- **Overview** — multi-CSV upload (drag-and-drop), parsing & validation,
+  overview cards, gap-trend chart, gap distribution (histogram + zone summary),
+  day-wise analysis & day comparison, research highlights, data-quality
+  warnings and a virtualized sample inspector.
+- **Events** — zone event detection (gap enters a zone from below), event
+  quality (valid / invalid / day-ended / dataset-ended), per-zone counts.
+- **Recovery Matrix** — per-zone recovery probability and a recovery-target
+  matrix (time to reach each lower gap level), colour-coded.
+- **MAE Analysis** — Maximum Adverse Excursion: how far recovered vs failed
+  events expand before resolving (percentile tables + distribution).
+- **Stop-Loss Research** — survival sweep across SL levels with suggested
+  statistical SL references (P90 / P95 / P99 / worst). Evidence only.
+- **Failed Events** — failed-event distribution, by-session/day breakdown,
+  recovery-after-failure buckets, and a details drawer.
+- **Event Explorer** — filterable event table with a replay chart (entry,
+  max-adverse, recovery, SL level and day-boundary markers).
+- **Session Analysis** — per-session recovery, risk, best/worst zone, sync.
+- **Exports** — every report (Gap Zone Recovery, Stop-Loss Survival, Failed
+  Events, Day-wise, Session, Full Summary) to CSV / JSON / printable HTML.
+- **Settings** — bin size, recovery/SL steps, min events per zone and default
+  session filter, persisted to `localStorage`.
 
-> Out of scope for R1 (planned later): recovery analysis, stop-loss analysis,
-> event replay.
+> Research only — no broker connection, orders, or trading signals.
 
 ---
 

@@ -1,10 +1,13 @@
 import { DataProvider } from '@/context/DataContext';
 import { Dashboard } from '@/pages/Dashboard';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 export default function App() {
   return (
-    <DataProvider>
-      <Dashboard />
-    </DataProvider>
+    <ErrorBoundary>
+      <DataProvider>
+        <Dashboard />
+      </DataProvider>
+    </ErrorBoundary>
   );
 }

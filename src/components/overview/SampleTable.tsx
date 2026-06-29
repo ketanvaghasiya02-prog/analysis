@@ -1,22 +1,28 @@
 /**
- * Paginated preview of the active sample set, built with TanStack Table.
- * Read-only — this is research data inspection, not order entry.
+ * Virtualized sample inspector (Phase R1 + R12).
+ *
+ * Read-only preview of the active sample set. Rows are windowed (only the
+ * visible slice is rendered) so the table stays responsive even when many CSV
+ * files are merged into tens of thousands of rows. Not order entry.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
   useReactTable,
   type ColumnDef,
-  type PaginationState,
 } from '@tanstack/react-table';
 import { useData } from '@/context/DataContext';
 import type { GapSample } from '@/types/gap';
-import { fmtNumber } from '@/utils/format';
+import { fmtInt, fmtNumber } from '@/utils/format';
 import { isSynced } from '@/utils/statistics';
 import { TableIcon } from '@/components/common/icons';
+
+const ROW_HEIGHT = 30;
+const VIEWPORT_HEIGHT = 480;
+const OVERSCAN = 10;
+const COL_COUNT = 11;
 
 const columns: ColumnDef<GapSample>[] = [
   { header: '#', accessorKey: 'sampleId', cell: (c) => <span className="text-ink-faint">{String(c.getValue())}</span> },
@@ -45,9 +51,7 @@ const columns: ColumnDef<GapSample>[] = [
         <span
           className={[
             'rounded px-1.5 py-0.5 text-[11px] font-medium',
-            isSynced(v)
-              ? 'bg-positive/15 text-positive'
-              : 'bg-warning/15 text-warning',
+            isSynced(v) ? 'bg-positive/15 text-positive' : 'bg-warning/15 text-warning',
           ].join(' ')}
         >
           {v}
@@ -60,27 +64,40 @@ const columns: ColumnDef<GapSample>[] = [
 
 export function SampleTable() {
   const { filteredSamples } = useData();
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 25,
-  });
-
   const data = useMemo(() => filteredSamples, [filteredSamples]);
 
-  // Reset to the first page whenever the underlying set changes (mode/filters),
-  // so a stale page index never lands the user on an empty page.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  // Reset scroll position when the underlying set changes (mode/filters).
   useEffect(() => {
-    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setScrollTop(0);
   }, [filteredSamples]);
 
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    state: { pagination },
-    onPaginationChange: setPagination,
   });
+
+  const rows = table.getRowModel().rows;
+  const total = rows.length;
+
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const visibleCount =
+    Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2;
+  const endIndex = Math.min(total, startIndex + visibleCount);
+  const paddingTop = startIndex * ROW_HEIGHT;
+  const paddingBottom = (total - endIndex) * ROW_HEIGHT;
+  const visibleRows = rows.slice(startIndex, endIndex);
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => setScrollTop(top));
+  };
 
   if (data.length === 0) {
     return (
@@ -89,9 +106,6 @@ export function SampleTable() {
       </section>
     );
   }
-
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const pageCount = table.getPageCount();
 
   return (
     <section className="card overflow-hidden">
@@ -102,25 +116,19 @@ export function SampleTable() {
             Sample Inspector
           </h2>
         </div>
-        <div className="flex items-center gap-2 text-xs text-ink-muted">
-          <span>Rows per page</span>
-          <select
-            value={pageSize}
-            onChange={(e) => table.setPageSize(Number(e.target.value))}
-            className="rounded border border-panel-border bg-panel px-2 py-1 text-ink focus:border-accent focus:outline-none"
-          >
-            {[10, 25, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
+        <span className="text-xs text-ink-faint">
+          {fmtInt(total)} samples · virtualized
+        </span>
       </header>
 
-      <div className="overflow-x-auto">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="overflow-auto"
+        style={{ maxHeight: VIEWPORT_HEIGHT }}
+      >
         <table className="w-full text-left text-sm">
-          <thead className="bg-panel text-xs uppercase tracking-wide text-ink-faint">
+          <thead className="sticky top-0 z-10 bg-panel text-xs uppercase tracking-wide text-ink-faint">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((h) => (
@@ -133,46 +141,40 @@ export function SampleTable() {
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-panel-border font-mono text-xs">
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="hover:bg-panel/50">
+          <tbody className="font-mono text-xs">
+            {paddingTop > 0 && (
+              <tr aria-hidden>
+                <td colSpan={COL_COUNT} style={{ height: paddingTop }} />
+              </tr>
+            )}
+            {visibleRows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-panel-border hover:bg-panel/50"
+                style={{ height: ROW_HEIGHT }}
+              >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="whitespace-nowrap px-3 py-1.5 text-ink-muted">
+                  <td
+                    key={cell.id}
+                    className="whitespace-nowrap px-3 text-ink-muted"
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
               </tr>
             ))}
+            {paddingBottom > 0 && (
+              <tr aria-hidden>
+                <td colSpan={COL_COUNT} style={{ height: paddingBottom }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      <footer className="flex items-center justify-between border-t border-panel-border px-5 py-2.5 text-xs text-ink-muted">
-        <span>
-          Showing {table.getRowModel().rows.length} of{' '}
-          {data.length.toLocaleString()} samples
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn px-2 py-1"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Prev
-          </button>
-          <span className="font-mono">
-            {pageIndex + 1} / {Math.max(1, pageCount)}
-          </span>
-          <button
-            type="button"
-            className="btn px-2 py-1"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </button>
-        </div>
+      <footer className="border-t border-panel-border px-5 py-2 text-xs text-ink-faint">
+        Showing rows {total === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
+        {fmtInt(total)}
       </footer>
     </section>
   );

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { InfoTip } from '@/components/common/InfoTip';
 
 interface StatCardProps {
   label: string;
@@ -6,6 +7,8 @@ interface StatCardProps {
   hint?: string;
   icon?: ReactNode;
   tone?: 'default' | 'positive' | 'warning' | 'negative' | 'accent';
+  /** Optional explanation shown as an info tooltip next to the label. */
+  tooltip?: string;
 }
 
 const toneClass: Record<NonNullable<StatCardProps['tone']>, string> = {
@@ -23,11 +26,15 @@ export function StatCard({
   hint,
   icon,
   tone = 'default',
+  tooltip,
 }: StatCardProps) {
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
-        <span className="stat-label">{label}</span>
+        <span className="stat-label">
+          {label}
+          {tooltip ? <InfoTip text={tooltip} /> : null}
+        </span>
         {icon ? <span className="text-ink-faint">{icon}</span> : null}
       </div>
       <div className={['stat-value mt-2', toneClass[tone]].join(' ')}>

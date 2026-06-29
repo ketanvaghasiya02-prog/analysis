@@ -17,6 +17,8 @@ import { FilterBar } from '@/components/filters/FilterBar';
 import { DayComparisonCharts } from '@/components/comparison/DayComparisonCharts';
 import { DayComparisonTable } from '@/components/comparison/DayComparisonTable';
 import { GapDistribution } from '@/components/distribution/GapDistribution';
+import { WarningsPanel } from '@/components/overview/WarningsPanel';
+import { HighlightCards } from '@/components/overview/HighlightCards';
 
 export function OverviewView() {
   const { selection } = useData();
@@ -25,7 +27,12 @@ export function OverviewView() {
   return (
     <div className="space-y-5">
       <AnalysisModeSelector />
-      <FilterBar />
+      {/* Sticky global filters stay visible while scrolling the overview. */}
+      <div className="sticky top-0 z-20 -mx-6 bg-panel/95 px-6 py-1 backdrop-blur supports-[backdrop-filter]:bg-panel/80">
+        <FilterBar />
+      </div>
+      <WarningsPanel />
+      <HighlightCards />
       <OverviewCards />
       <GapTrendChart />
       <GapDistribution />

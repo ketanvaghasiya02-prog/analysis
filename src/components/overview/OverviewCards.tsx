@@ -50,18 +50,21 @@ export function OverviewCards() {
         value={fmtInt(validation.filesUploaded)}
         hint={`${dataset.dayKeys.length} day buckets`}
         icon={<FileIcon className="text-base" />}
+        tooltip="Number of CSV files merged into the current dataset."
       />
       <StatCard
         label="Total Samples"
         value={fmtInt(filteredSamples.length)}
         hint={`${fmtInt(validation.validRows)} valid in dataset`}
         icon={<LayersIcon className="text-base" />}
+        tooltip="Valid samples in the current view (after analysis mode and filters)."
       />
       <StatCard
         label="Date Range"
         value={<span className="text-base leading-snug">{rangeLabel}</span>}
         hint={`${dataset.dayKeys.length} trading day(s)`}
         icon={<CalendarIcon className="text-base" />}
+        tooltip="Span of trading days detected from ServerTime / filenames."
       />
       <StatCard
         label="Sync Quality"
@@ -69,29 +72,34 @@ export function OverviewCards() {
         hint="Share of in-sync samples"
         tone={syncTone}
         icon={<CheckIcon className="text-base" />}
+        tooltip="Percentage of samples whose SyncStatus indicates the spot and future ticks were in sync."
       />
       <StatCard
         label="Average Gap"
         value={fmtNumber(stats.gaps.mean, 4)}
         hint={`σ ${fmtNumber(stats.gaps.stdDev, 4)}`}
         tone="accent"
+        tooltip="Mean of the Gap column across samples in view (σ = standard deviation)."
       />
       <StatCard
         label="Max Gap"
         value={fmtNumber(stats.gaps.max, 4)}
         hint="Largest observed gap"
         tone="positive"
+        tooltip="Largest Gap value observed in the current view."
       />
       <StatCard
         label="Min Gap"
         value={fmtNumber(stats.gaps.min, 4)}
         hint="Smallest observed gap"
         tone="negative"
+        tooltip="Smallest Gap value observed in the current view."
       />
       <StatCard
         label="Median Gap"
         value={fmtNumber(stats.gaps.median, 4)}
         hint={`${fmtInt(stats.gaps.count)} numeric samples`}
+        tooltip="Middle Gap value (50th percentile) across numeric samples."
       />
     </section>
   );

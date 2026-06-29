@@ -9,6 +9,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -34,7 +35,6 @@ import {
 } from '@/utils/filters';
 import {
   buildGapZones,
-  DEFAULT_BIN_SIZE,
   findZone,
   type GapZone,
 } from '@/utils/histogram';
@@ -47,6 +47,7 @@ import {
   DEFAULT_SL_SETTINGS,
   type StopLossSettings,
 } from '@/utils/stoploss';
+import { loadSettings, saveSettings } from '@/utils/settings';
 
 export type AppView =
   | 'overview'
@@ -56,7 +57,8 @@ export type AppView =
   | 'stoploss'
   | 'failed'
   | 'explorer'
-  | 'session';
+  | 'session'
+  | 'settings';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
@@ -84,6 +86,9 @@ interface DataContextValue {
   // Stop-loss research settings (Phase R7).
   slSettings: StopLossSettings;
 
+  // Default session filter (Phase R12 setting).
+  defaultSessions: string[];
+
   // Navigation.
   view: AppView;
 
@@ -108,6 +113,8 @@ interface DataContextValue {
   updateSlSettings: (patch: Partial<StopLossSettings>) => void;
   resetSlSettings: () => void;
 
+  setDefaultSessions: (sessions: string[]) => void;
+
   setView: (view: AppView) => void;
 }
 
@@ -120,19 +127,45 @@ const DEFAULT_SELECTION: AnalysisSelection = {
 const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  // Hydrate user-tunable settings from localStorage (once).
+  const [persisted] = useState(loadSettings);
+
   const [dataset, setDataset] = useState<CombinedDataset | null>(null);
   const [selection, setSelection] = useState<AnalysisSelection>(DEFAULT_SELECTION);
-  const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS);
+  const [filters, setFiltersState] = useState<FilterState>(() => ({
+    ...EMPTY_FILTERS,
+    sessions: persisted.defaultSessions,
+  }));
   const [isParsing, setIsParsing] = useState(false);
-  const [gapBinSize, setGapBinSizeState] = useState(DEFAULT_BIN_SIZE);
+  const [gapBinSize, setGapBinSizeState] = useState(persisted.gapBinSize);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [recoverySettings, setRecoverySettings] = useState<RecoverySettings>(
-    DEFAULT_RECOVERY_SETTINGS,
+    persisted.recoverySettings,
   );
-  const [slSettings, setSlSettings] = useState<StopLossSettings>(
-    DEFAULT_SL_SETTINGS,
+  const [slSettings, setSlSettings] = useState<StopLossSettings>(() => ({
+    ...DEFAULT_SL_SETTINGS,
+    step: persisted.slStep,
+  }));
+  const [defaultSessions, setDefaultSessionsState] = useState<string[]>(
+    persisted.defaultSessions,
   );
   const [view, setView] = useState<AppView>('overview');
+
+  // Persist settings whenever a tunable value changes.
+  useEffect(() => {
+    saveSettings({
+      gapBinSize,
+      recoverySettings,
+      slStep: slSettings.step,
+      defaultSessions,
+    });
+  }, [gapBinSize, recoverySettings, slSettings.step, defaultSessions]);
+
+  const setDefaultSessions = useCallback((sessions: string[]) => {
+    setDefaultSessionsState(sessions);
+    // Apply the new default to the live session filter immediately.
+    setFiltersState((prev) => ({ ...prev, sessions }));
+  }, []);
 
   const addFiles = useCallback(
     async (files: File[]) => {
@@ -160,15 +193,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   const reset = useCallback(() => {
+    // Clears the loaded dataset and view state, but keeps the user's persisted
+    // analysis settings (bin size, recovery/SL parameters, default sessions).
     setDataset(null);
     setSelection(DEFAULT_SELECTION);
-    setFiltersState(EMPTY_FILTERS);
-    setGapBinSizeState(DEFAULT_BIN_SIZE);
+    setFiltersState({ ...EMPTY_FILTERS, sessions: defaultSessions });
     setSelectedZoneId(null);
-    setRecoverySettings(DEFAULT_RECOVERY_SETTINGS);
-    setSlSettings(DEFAULT_SL_SETTINGS);
     setView('overview');
-  }, []);
+  }, [defaultSessions]);
 
   const updateSlSettings = useCallback((patch: Partial<StopLossSettings>) => {
     setSlSettings((prev) => ({ ...prev, ...patch }));
@@ -310,6 +342,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       events,
       recoverySettings,
       slSettings,
+      defaultSessions,
       view,
       addFiles,
       reset,
@@ -326,6 +359,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       resetRecoverySettings,
       updateSlSettings,
       resetSlSettings,
+      setDefaultSessions,
       setView,
     }),
     [
@@ -344,6 +378,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       events,
       recoverySettings,
       slSettings,
+      defaultSessions,
       view,
       addFiles,
       reset,
@@ -360,6 +395,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       resetRecoverySettings,
       updateSlSettings,
       resetSlSettings,
+      setDefaultSessions,
     ],
   );
 
