@@ -21,12 +21,12 @@ import { isSynced } from '@/utils/statistics';
 import { TableIcon } from '@/components/common/icons';
 
 const OUTCOME_TONE: Record<ScenarioOutcome, string> = {
-  RECOVERED_WITHOUT_SL: 'text-positive',
-  RECOVERED_AFTER_SL: 'text-warning',
-  SL_HIT: 'text-negative',
+  RECOVERED_BEFORE_SL: 'text-positive',
+  SL_HIT_THEN_RECOVERED: 'text-warning',
+  SL_HIT_NOT_RECOVERED: 'text-negative',
   DAY_END_NO_RESOLUTION: 'text-ink-muted',
-  MAX_HOLDING_NO_RESOLUTION: 'text-ink-muted',
   DATASET_END_NO_RESOLUTION: 'text-ink-muted',
+  MAX_HOLDING_EXPIRED: 'text-ink-muted',
 };
 
 function SortIndicator({ dir }: { dir: false | 'asc' | 'desc' }) {
@@ -79,11 +79,11 @@ export function ScenarioEventTable({
         ),
       },
       {
-        header: 'Outcome',
-        accessorKey: 'outcome',
+        header: 'SL Hit',
+        accessorKey: 'slHit',
         cell: (c) => {
-          const o = c.getValue() as ScenarioOutcome;
-          return <span className={OUTCOME_TONE[o]}>{OUTCOME_LABELS[o]}</span>;
+          const v = c.getValue() as boolean;
+          return <span className={v ? 'text-negative' : 'text-ink-faint'}>{v ? 'Yes' : 'No'}</span>;
         },
       },
       {
@@ -92,9 +92,25 @@ export function ScenarioEventTable({
         cell: (c) => fmtDuration(c.getValue() as number | null),
       },
       {
+        header: 'Recovery Hit',
+        accessorKey: 'recoveryHit',
+        cell: (c) => {
+          const v = c.getValue() as boolean;
+          return <span className={v ? 'text-positive' : 'text-ink-faint'}>{v ? 'Yes' : 'No'}</span>;
+        },
+      },
+      {
         header: 'Recovery Time',
         accessorKey: 'recoveryTimeSec',
         cell: (c) => fmtDuration(c.getValue() as number | null),
+      },
+      {
+        header: 'Final Outcome',
+        accessorKey: 'outcome',
+        cell: (c) => {
+          const o = c.getValue() as ScenarioOutcome;
+          return <span className={OUTCOME_TONE[o]}>{OUTCOME_LABELS[o]}</span>;
+        },
       },
       {
         header: 'Duration',

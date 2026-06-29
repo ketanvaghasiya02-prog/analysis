@@ -8,12 +8,12 @@ import { fmtInt, fmtPercent } from '@/utils/format';
 import { TableIcon } from '@/components/common/icons';
 
 const TONE: Record<string, string> = {
-  RECOVERED_WITHOUT_SL: 'text-positive',
-  RECOVERED_AFTER_SL: 'text-warning',
-  SL_HIT: 'text-negative',
+  RECOVERED_BEFORE_SL: 'text-positive',
+  SL_HIT_THEN_RECOVERED: 'text-warning',
+  SL_HIT_NOT_RECOVERED: 'text-negative',
   DAY_END_NO_RESOLUTION: 'text-ink-muted',
-  MAX_HOLDING_NO_RESOLUTION: 'text-ink-muted',
   DATASET_END_NO_RESOLUTION: 'text-ink-muted',
+  MAX_HOLDING_EXPIRED: 'text-ink-muted',
 };
 
 export function OutcomeBreakdownTable({ result }: { result: ScenarioResult }) {
@@ -38,7 +38,6 @@ export function OutcomeBreakdownTable({ result }: { result: ScenarioResult }) {
         <tbody className="divide-y divide-panel-border text-sm">
           {OUTCOME_ORDER.map((o) => {
             const count = result.counts[o];
-            if (count === 0) return null;
             return (
               <tr key={o} className="hover:bg-panel/50">
                 <td className={['px-4 py-2', TONE[o]].join(' ')}>

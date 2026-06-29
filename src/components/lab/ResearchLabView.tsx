@@ -25,6 +25,7 @@ import { SensitivityTable } from '@/components/lab/SensitivityTable';
 import { ScenarioEventTable } from '@/components/lab/ScenarioEventTable';
 import { ScenarioCharts } from '@/components/lab/ScenarioCharts';
 import { ScenarioPathChart } from '@/components/lab/ScenarioPathChart';
+import { ScenarioHelpPanel } from '@/components/lab/ScenarioHelpPanel';
 import { TopTradeFinder } from '@/components/lab/TopTradeFinder';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { AlertIcon } from '@/components/common/icons';
@@ -149,6 +150,8 @@ export function ResearchLabView() {
           data. No orders, no money, no buy/sell recommendation.
         </p>
       </section>
+
+      <ScenarioHelpPanel />
 
       {/* Date-time range */}
       <section className="card p-4">
@@ -366,6 +369,18 @@ export function ResearchLabView() {
 
       <ScenarioCards result={result} />
 
+      {/* Accounting validation */}
+      {!result.accountingOk && (
+        <div className="flex items-start gap-3 rounded-lg border border-negative/40 bg-negative/10 p-3 text-sm text-negative">
+          <AlertIcon className="mt-0.5 text-base" />
+          <span>
+            Outcome accounting mismatch — outcomes sum to{' '}
+            {fmtInt(result.outcomeTotal)} but there are {fmtInt(result.validEvents)}{' '}
+            events.
+          </span>
+        </div>
+      )}
+
       {activeSelected && (
         <ScenarioPathChart
           samples={labSamples}
@@ -380,6 +395,45 @@ export function ResearchLabView() {
         <OutcomeBreakdownTable result={result} />
         <SensitivityTable rows={sensitivity} currentSl={input.stopLoss} />
       </div>
+
+      {/* Outcome explanation + accounting debug */}
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="card p-4 text-xs leading-relaxed text-ink-muted lg:col-span-2">
+          <p>
+            <span className="font-semibold text-positive">Recovery Before SL</span>{' '}
+            means the target was reached before stop-loss.
+          </p>
+          <p className="mt-1.5">
+            <span className="font-semibold text-warning">Recovery After SL</span>{' '}
+            means the idea eventually worked, but the selected SL was too tight.
+          </p>
+          <p className="mt-1.5">
+            <span className="font-semibold text-ink">Unresolved</span> means the
+            event did not reach recovery or SL before the selected scan limit.
+          </p>
+        </div>
+        <div className="card p-4">
+          <div className="stat-label mb-2">Debug · Accounting</div>
+          <div className="space-y-1 font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-ink-muted">Outcome total</span>
+              <span className="text-ink">{fmtInt(result.outcomeTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-ink-muted">Total events</span>
+              <span className="text-ink">{fmtInt(result.validEvents)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-ink-muted">Status</span>
+              <span
+                className={result.accountingOk ? 'text-positive' : 'text-negative'}
+              >
+                {result.accountingOk ? 'OK' : 'ERROR'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <ScenarioEventTable
         events={result.events}

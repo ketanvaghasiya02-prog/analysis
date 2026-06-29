@@ -43,29 +43,29 @@ export const DEFAULT_SCENARIO_INPUT: ScenarioInput = {
 };
 
 export type ScenarioOutcome =
-  | 'RECOVERED_WITHOUT_SL'
-  | 'SL_HIT'
-  | 'RECOVERED_AFTER_SL'
+  | 'RECOVERED_BEFORE_SL'
+  | 'SL_HIT_THEN_RECOVERED'
+  | 'SL_HIT_NOT_RECOVERED'
   | 'DAY_END_NO_RESOLUTION'
   | 'DATASET_END_NO_RESOLUTION'
-  | 'MAX_HOLDING_NO_RESOLUTION';
+  | 'MAX_HOLDING_EXPIRED';
 
 export const OUTCOME_LABELS: Record<ScenarioOutcome, string> = {
-  RECOVERED_WITHOUT_SL: 'Recovered without SL',
-  SL_HIT: 'SL hit',
-  RECOVERED_AFTER_SL: 'Recovered after SL',
-  DAY_END_NO_RESOLUTION: 'Day ended (no resolution)',
-  DATASET_END_NO_RESOLUTION: 'Dataset ended (no resolution)',
-  MAX_HOLDING_NO_RESOLUTION: 'Max holding reached (no resolution)',
+  RECOVERED_BEFORE_SL: 'Recovered before SL',
+  SL_HIT_THEN_RECOVERED: 'SL hit then recovered',
+  SL_HIT_NOT_RECOVERED: 'SL hit not recovered',
+  DAY_END_NO_RESOLUTION: 'Day end no resolution',
+  DATASET_END_NO_RESOLUTION: 'Dataset end no resolution',
+  MAX_HOLDING_EXPIRED: 'Max holding expired',
 };
 
 export const OUTCOME_ORDER: ScenarioOutcome[] = [
-  'RECOVERED_WITHOUT_SL',
-  'RECOVERED_AFTER_SL',
-  'SL_HIT',
+  'RECOVERED_BEFORE_SL',
+  'SL_HIT_THEN_RECOVERED',
+  'SL_HIT_NOT_RECOVERED',
   'DAY_END_NO_RESOLUTION',
-  'MAX_HOLDING_NO_RESOLUTION',
   'DATASET_END_NO_RESOLUTION',
+  'MAX_HOLDING_EXPIRED',
 ];
 
 type TerminalReason = 'recovery' | 'day' | 'holding' | 'dataset';
@@ -85,6 +85,10 @@ export interface ScenarioEvent {
   /** entryGap − minGap (favorable move toward recovery, gap points). */
   favorableMove: number;
   recovered: boolean;
+  /** True when the gap reached recovery (gap <= recoveryTo) within the window. */
+  recoveryHit: boolean;
+  /** True when the gap reached the stop-loss level within the window. */
+  slHit: boolean;
   recoveryTimeSec: number | null;
   slHitTimeSec: number | null;
   durationSec: number | null;
@@ -122,16 +126,25 @@ export interface ScenarioResult {
   validEvents: number;
 
   counts: Record<ScenarioOutcome, number>;
-  recoveredWithoutSl: number;
-  slHit: number;
-  recoveredAfterSl: number;
+  recoveredBeforeSl: number;
+  slHitThenRecovered: number;
+  slHitNotRecovered: number;
+  dayEndNoResolution: number;
+  datasetEndNoResolution: number;
+  maxHoldingExpired: number;
   unresolved: number;
 
   recoveryPctIgnoringSl: number;
   recoveryBeforeSlPct: number;
+  /** SL Hit % = (SL hit then recovered + SL hit not recovered) / total. */
   slHitPct: number;
+  /** Recovery After SL % = SL hit then recovered / total. */
   recoveredAfterSlPct: number;
   unresolvedPct: number;
+
+  /** Sum of all six outcome counts — must equal validEvents. */
+  outcomeTotal: number;
+  accountingOk: boolean;
 
   avgRecoveryTimeSec: number | null;
   medianRecoveryTimeSec: number | null;
@@ -168,14 +181,17 @@ export function classifyAtSl(
   sl: number,
 ): ScenarioOutcome {
   if (event.recovered) {
-    return event.maxGap >= sl - EPS ? 'RECOVERED_AFTER_SL' : 'RECOVERED_WITHOUT_SL';
+    // Recovered: did the gap touch the SL level before recovering?
+    return event.maxGap >= sl - EPS
+      ? 'SL_HIT_THEN_RECOVERED'
+      : 'RECOVERED_BEFORE_SL';
   }
-  if (event.maxGap >= sl - EPS) return 'SL_HIT';
+  if (event.maxGap >= sl - EPS) return 'SL_HIT_NOT_RECOVERED';
   switch (event.terminal) {
     case 'day':
       return 'DAY_END_NO_RESOLUTION';
     case 'holding':
-      return 'MAX_HOLDING_NO_RESOLUTION';
+      return 'MAX_HOLDING_EXPIRED';
     default:
       return 'DATASET_END_NO_RESOLUTION';
   }
@@ -274,10 +290,12 @@ export function computeScenario(
     }
 
     const outcome = classifyAtSl({ recovered, maxGap, terminal }, stopLoss);
-    const slInvolved = outcome === 'SL_HIT' || outcome === 'RECOVERED_AFTER_SL';
+    const slHit = maxGap >= stopLoss - EPS;
+    const slInvolved =
+      outcome === 'SL_HIT_NOT_RECOVERED' || outcome === 'SL_HIT_THEN_RECOVERED';
     const durationSec = recovered
       ? recoveryTimeSec
-      : outcome === 'SL_HIT'
+      : outcome === 'SL_HIT_NOT_RECOVERED'
         ? firstSlHitSec
         : lastTimeSec;
 
@@ -294,6 +312,8 @@ export function computeScenario(
       minGap,
       favorableMove: entryGap - minGap,
       recovered,
+      recoveryHit: recovered,
+      slHit,
       recoveryTimeSec,
       slHitTimeSec: slInvolved ? firstSlHitSec : null,
       durationSec,
@@ -314,12 +334,12 @@ function summariseScenario(
   samples: GapSample[],
 ): ScenarioResult {
   const counts: Record<ScenarioOutcome, number> = {
-    RECOVERED_WITHOUT_SL: 0,
-    SL_HIT: 0,
-    RECOVERED_AFTER_SL: 0,
+    RECOVERED_BEFORE_SL: 0,
+    SL_HIT_THEN_RECOVERED: 0,
+    SL_HIT_NOT_RECOVERED: 0,
     DAY_END_NO_RESOLUTION: 0,
     DATASET_END_NO_RESOLUTION: 0,
-    MAX_HOLDING_NO_RESOLUTION: 0,
+    MAX_HOLDING_EXPIRED: 0,
   };
   for (const e of events) counts[e.outcome] += 1;
 
@@ -327,7 +347,11 @@ function summariseScenario(
   const unresolved =
     counts.DAY_END_NO_RESOLUTION +
     counts.DATASET_END_NO_RESOLUTION +
-    counts.MAX_HOLDING_NO_RESOLUTION;
+    counts.MAX_HOLDING_EXPIRED;
+
+  // Accounting: every event must land in exactly one outcome.
+  const outcomeTotal = OUTCOME_ORDER.reduce((a, o) => a + counts[o], 0);
+  const accountingOk = outcomeTotal === valid;
 
   const pct = (x: number) => (valid > 0 ? (x / valid) * 100 : 0);
 
@@ -385,15 +409,22 @@ function summariseScenario(
     totalEvents,
     validEvents: valid,
     counts,
-    recoveredWithoutSl: counts.RECOVERED_WITHOUT_SL,
-    slHit: counts.SL_HIT,
-    recoveredAfterSl: counts.RECOVERED_AFTER_SL,
+    recoveredBeforeSl: counts.RECOVERED_BEFORE_SL,
+    slHitThenRecovered: counts.SL_HIT_THEN_RECOVERED,
+    slHitNotRecovered: counts.SL_HIT_NOT_RECOVERED,
+    dayEndNoResolution: counts.DAY_END_NO_RESOLUTION,
+    datasetEndNoResolution: counts.DATASET_END_NO_RESOLUTION,
+    maxHoldingExpired: counts.MAX_HOLDING_EXPIRED,
     unresolved,
-    recoveryPctIgnoringSl: pct(counts.RECOVERED_WITHOUT_SL + counts.RECOVERED_AFTER_SL),
-    recoveryBeforeSlPct: pct(counts.RECOVERED_WITHOUT_SL),
-    slHitPct: pct(counts.SL_HIT),
-    recoveredAfterSlPct: pct(counts.RECOVERED_AFTER_SL),
+    recoveryPctIgnoringSl: pct(
+      counts.RECOVERED_BEFORE_SL + counts.SL_HIT_THEN_RECOVERED,
+    ),
+    recoveryBeforeSlPct: pct(counts.RECOVERED_BEFORE_SL),
+    slHitPct: pct(counts.SL_HIT_THEN_RECOVERED + counts.SL_HIT_NOT_RECOVERED),
+    recoveredAfterSlPct: pct(counts.SL_HIT_THEN_RECOVERED),
     unresolvedPct,
+    outcomeTotal,
+    accountingOk,
     avgRecoveryTimeSec: recTimeSummary.mean,
     medianRecoveryTimeSec: recTimeSummary.median,
     maxRecoveryTimeSec: recTimeSummary.max,
@@ -445,13 +476,13 @@ export function computeSensitivity(
     for (const e of events) {
       const outcome = classifyAtSl(e, sl);
       switch (outcome) {
-        case 'RECOVERED_WITHOUT_SL':
+        case 'RECOVERED_BEFORE_SL':
           recoveredWithout += 1;
           break;
-        case 'RECOVERED_AFTER_SL':
+        case 'SL_HIT_THEN_RECOVERED':
           recoveredStopped += 1; // a recovery this SL would have stopped
           break;
-        case 'SL_HIT':
+        case 'SL_HIT_NOT_RECOVERED':
           slHit += 1;
           failedCut += 1; // a non-recovering event this SL would have cut
           break;

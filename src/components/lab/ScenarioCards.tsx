@@ -1,5 +1,9 @@
 /**
  * Research Lab main result cards (additive).
+ *
+ * Surfaces every outcome family — including unresolved — so no events are ever
+ * silently dropped. Each metric carries a "?" help tip (definition + formula +
+ * example).
  */
 
 import type { ScenarioResult } from '@/utils/scenario';
@@ -41,70 +45,132 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
   const rr = result.riskReward;
 
   return (
-    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-      <Card
-        label="Total Events"
-        value={fmtInt(result.totalEvents)}
-        tooltip="Entries into the entry gap zone detected in the data. Valid events (passing session/sync filters) are analysed."
-        hint={`${fmtInt(result.validEvents)} valid`}
-      />
-      <Card
-        label="Recovery Before SL %"
-        value={fmtPercent(result.recoveryBeforeSlPct)}
-        tooltip="Share of valid events that reached the recovery target without the gap ever touching the stop-loss level."
-        tone="text-positive"
-      />
-      <Card
-        label="SL Hit %"
-        value={fmtPercent(result.slHitPct)}
-        tooltip="Share of valid events where the gap reached the stop-loss level and never recovered within the scan window."
-        tone="text-negative"
-      />
-      <Card
-        label="Recovery After SL %"
-        value={fmtPercent(result.recoveredAfterSlPct)}
-        tooltip="Share of valid events that touched the stop-loss level first but later still reached the recovery target."
-        tone="text-warning"
-      />
-      <Card
-        label="Avg Recovery Time"
-        value={fmtDuration(result.avgRecoveryTimeSec)}
-        tooltip="Average time from entry to reaching the recovery target, across recovered events."
-      />
-      <Card
-        label="P95 Max Adverse Gap"
-        value={fmtNumber(result.adverse.p95, 3)}
-        tooltip="95th percentile of the highest gap reached after entry — a stop below this would have been hit ~5% of the time."
-        tone="text-accent"
-      />
-      <Card
-        label="Worst Max Gap"
-        value={fmtNumber(result.adverse.worst, 3)}
-        tooltip="Largest gap any event reached after entry."
-        tone="text-negative"
-      />
-      <Card
-        label="Risk / Reward (gap pts)"
-        value={rr && rr.rr !== null ? fmtNumber(rr.rr, 2) : '—'}
-        tooltip="Gap-point reward (avg entry gap − recovery target to) divided by risk (stop-loss − avg entry gap). Gap points only — not money."
-        hint={
-          rr
-            ? `reward ${fmtNumber(rr.reward, 2)} / risk ${fmtNumber(rr.risk, 2)}`
-            : undefined
-        }
-      />
-      <Card
-        label="Recovery % (ignoring SL)"
-        value={fmtPercent(result.recoveryPctIgnoringSl)}
-        tooltip="Share of valid events that eventually reached the recovery target, whether or not the stop-loss was touched first."
-      />
-      <Card
-        label="Research Confidence"
-        value={result.confidence.level}
-        tooltip="Heuristic from event count, sync quality, unresolved % and day coverage. Not a measure of profitability."
-        tone={CONF_TONE[result.confidence.level]}
-        hint={`score ${fmtNumber(result.confidence.score * 100, 0)} / 100`}
-      />
-    </section>
+    <>
+      {/* Primary outcome metrics — always show all six, including unresolved. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <Card
+          label="Total Events"
+          value={fmtInt(result.validEvents)}
+          tooltip={
+            'Definition: every entry-zone event that was analysed (passing session/sync filters).\n' +
+            'Formula: count of detected entries that were classified.\n' +
+            (result.totalEvents !== result.validEvents
+              ? `Note: ${result.totalEvents} detected, ${result.validEvents} analysed after filters.`
+              : 'Each event gets exactly one final outcome.')
+          }
+          hint={
+            result.totalEvents !== result.validEvents
+              ? `${fmtInt(result.totalEvents)} detected`
+              : undefined
+          }
+        />
+        <Card
+          label="Recovery Before SL %"
+          value={fmtPercent(result.recoveryBeforeSlPct)}
+          tone="text-positive"
+          tooltip={
+            'Definition: the recovery target was reached before stop-loss was ever touched.\n' +
+            'Formula: Recovered Before SL / Total Events × 100.\n' +
+            'Example: 62 of 100 events → 62%.'
+          }
+        />
+        <Card
+          label="Recovery Ignoring SL %"
+          value={fmtPercent(result.recoveryPctIgnoringSl)}
+          tone="text-accent"
+          tooltip={
+            'Definition: the idea eventually worked, whether or not SL was touched first.\n' +
+            'Formula: (Recovered Before SL + SL Hit Then Recovered) / Total × 100.\n' +
+            'Example: (62 + 25) / 100 → 87%.'
+          }
+        />
+        <Card
+          label="SL Hit %"
+          value={fmtPercent(result.slHitPct)}
+          tone="text-negative"
+          tooltip={
+            'Definition: the gap reached the stop-loss level at some point.\n' +
+            'Formula: (SL Hit Then Recovered + SL Hit Not Recovered) / Total × 100.\n' +
+            'Example: (25 + 8) / 100 → 33%.'
+          }
+        />
+        <Card
+          label="Unresolved %"
+          value={fmtPercent(result.unresolvedPct)}
+          tone="text-warning"
+          tooltip={
+            'Definition: the event did not reach recovery or SL before the scan limit.\n' +
+            'Formula: (Day End + Dataset End + Max Holding Expired) / Total × 100.\n' +
+            'Example: (3 + 2 + 0) / 100 → 5%.'
+          }
+        />
+        <Card
+          label="Recovery After SL %"
+          value={fmtPercent(result.recoveredAfterSlPct)}
+          tone="text-warning"
+          tooltip={
+            'Definition: the idea eventually worked, but the selected SL was too tight — SL hit first, then recovery.\n' +
+            'Formula: SL Hit Then Recovered / Total × 100.\n' +
+            'Example: 25 of 100 events → 25%.'
+          }
+        />
+      </section>
+
+      {/* Secondary analytics. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <Card
+          label="Avg Recovery Time"
+          value={fmtDuration(result.avgRecoveryTimeSec)}
+          tooltip={
+            'Definition: average time from entry to reaching the recovery target.\n' +
+            'Formula: mean of recovery times over recovered events.'
+          }
+        />
+        <Card
+          label="P95 Max Adverse Gap"
+          value={fmtNumber(result.adverse.p95, 3)}
+          tone="text-accent"
+          tooltip={
+            'Definition: 95th percentile of the highest gap reached after entry.\n' +
+            'Formula: P95 of max-gap-after-entry across events.\n' +
+            'Use: a stop below this would have been hit ~5% of the time.'
+          }
+        />
+        <Card
+          label="Worst Max Gap"
+          value={fmtNumber(result.adverse.worst, 3)}
+          tone="text-negative"
+          tooltip={
+            'Definition: the largest gap any event reached after entry.\n' +
+            'Formula: max of max-gap-after-entry across events.'
+          }
+        />
+        <Card
+          label="Risk / Reward (gap pts)"
+          value={rr && rr.rr !== null ? fmtNumber(rr.rr, 2) : '—'}
+          tooltip={
+            'Definition: gap-point reward vs risk for this scenario (not money).\n' +
+            'Formula: Reward = Avg Entry Gap − Recovery Target To; Risk = Stop Loss − Avg Entry Gap; RR = Reward / Risk.\n' +
+            'Example: entry 18.20, recovery 15.50, SL 19.00 → reward 2.70 / risk 0.80 → 3.38.'
+          }
+          hint={
+            rr
+              ? `reward ${fmtNumber(rr.reward, 2)} / risk ${fmtNumber(rr.risk, 2)}`
+              : undefined
+          }
+        />
+        <Card
+          label="Research Confidence"
+          value={result.confidence.level}
+          tone={CONF_TONE[result.confidence.level]}
+          tooltip={
+            'Definition: how trustworthy these stats are (not a measure of profitability).\n' +
+            'Based on: number of events, sync quality, unresolved %, and day coverage.\n' +
+            'Shown as LOW / MEDIUM / HIGH.'
+          }
+          hint={`score ${fmtNumber(result.confidence.score * 100, 0)} / 100`}
+        />
+      </section>
+    </>
   );
 }
