@@ -158,6 +158,16 @@ export function SettingsIcon(props: IconProps) {
   );
 }
 
+export function FlaskIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 3h6" />
+      <path d="M10 3v6L5 19a1 1 0 0 0 .9 1.5h12.2A1 1 0 0 0 19 19l-5-10V3" />
+      <path d="M7.5 14h9" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

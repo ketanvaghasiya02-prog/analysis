@@ -10,6 +10,7 @@ import {
   ChartIcon,
   ClockIcon,
   FileIcon,
+  FlaskIcon,
   GaugeIcon,
   LayersIcon,
   RecoveryIcon,
@@ -45,6 +46,7 @@ export function Sidebar() {
     { id: 'failed', label: 'Failed Events', icon: WarningIcon },
     { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
     { id: 'session', label: 'Session Analysis', icon: ClockIcon },
+    { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 

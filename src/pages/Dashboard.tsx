@@ -19,6 +19,7 @@ import { FailedEventsView } from '@/components/failed/FailedEventsView';
 import { ExplorerView } from '@/components/explorer/ExplorerView';
 import { SessionView } from '@/components/session/SessionView';
 import { SettingsView } from '@/components/settings/SettingsView';
+import { ResearchLabView } from '@/components/lab/ResearchLabView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -61,6 +62,8 @@ export function Dashboard() {
     content = <ExplorerView />;
   } else if (view === 'session') {
     content = <SessionView />;
+  } else if (view === 'lab') {
+    content = <ResearchLabView />;
   } else {
     content = <OverviewView />;
   }

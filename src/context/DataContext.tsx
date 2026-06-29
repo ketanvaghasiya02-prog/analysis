@@ -58,6 +58,7 @@ export type AppView =
   | 'failed'
   | 'explorer'
   | 'session'
+  | 'lab'
   | 'settings';
 
 interface DataContextValue {

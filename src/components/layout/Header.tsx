@@ -36,9 +36,11 @@ export function Header() {
                 ? 'Event Explorer & Replay'
                 : view === 'session'
                   ? 'Session Recovery & Risk'
-                  : view === 'settings'
-                    ? 'Settings'
-                    : 'Gap Analysis Overview';
+                  : view === 'lab'
+                    ? 'Research Lab — Scenario Testing'
+                    : view === 'settings'
+                      ? 'Settings'
+                      : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =

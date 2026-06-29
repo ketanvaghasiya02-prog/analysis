@@ -1,0 +1,253 @@
+/**
+ * Research Lab page (additive).
+ *
+ * Interactive scenario testing: the user defines an entry gap zone, a recovery
+ * target zone and a stop-loss gap; the engine reports what happened historically
+ * across the filtered dataset. Research only — gap points, no money, no signals.
+ */
+
+import { useMemo, useState } from 'react';
+import { useData } from '@/context/DataContext';
+import {
+  computeScenario,
+  computeSensitivity,
+  DEFAULT_SCENARIO_INPUT,
+  scenarioEventListCsv,
+  scenarioSummaryJson,
+  sensitivityCsv,
+  type ScenarioEvent,
+  type ScenarioInput,
+} from '@/utils/scenario';
+import { downloadExport } from '@/utils/reports';
+import { ScenarioCards } from '@/components/lab/ScenarioCards';
+import { OutcomeBreakdownTable } from '@/components/lab/OutcomeBreakdownTable';
+import { SensitivityTable } from '@/components/lab/SensitivityTable';
+import { ScenarioEventTable } from '@/components/lab/ScenarioEventTable';
+import { ScenarioCharts } from '@/components/lab/ScenarioCharts';
+import { ScenarioPathChart } from '@/components/lab/ScenarioPathChart';
+import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
+import { AlertIcon } from '@/components/common/icons';
+
+function NumField({
+  label,
+  value,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="stat-label">{label}</span>
+      <input
+        type="number"
+        step={step}
+        value={value}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (Number.isFinite(v)) onChange(v);
+        }}
+        className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+      />
+    </label>
+  );
+}
+
+export function ResearchLabView() {
+  const { filteredSamples, filterOptions } = useData();
+  const [input, setInput] = useState<ScenarioInput>(DEFAULT_SCENARIO_INPUT);
+  const [selected, setSelected] = useState<ScenarioEvent | null>(null);
+
+  const patch = (p: Partial<ScenarioInput>) =>
+    setInput((prev) => ({ ...prev, ...p }));
+
+  // Heavy work memoized — recomputes only when the dataset or inputs change.
+  const result = useMemo(
+    () => computeScenario(filteredSamples, input),
+    [filteredSamples, input],
+  );
+  const sensitivity = useMemo(
+    () => computeSensitivity(result.events, input),
+    [result.events, input],
+  );
+
+  const activeSelected = useMemo(
+    () =>
+      selected ? result.events.find((e) => e.id === selected.id) ?? null : null,
+    [selected, result.events],
+  );
+
+  // Validation warnings.
+  const warnings: string[] = [];
+  if (result.validEvents < input.minEvents) {
+    warnings.push(
+      `Only ${result.validEvents} valid events — below the minimum of ${input.minEvents}. Results are low-confidence.`,
+    );
+  }
+  if (input.stopLoss <= input.entryTo) {
+    warnings.push(
+      'Stop-loss gap is at or below the entry zone top. A stop should sit above the entry zone.',
+    );
+  }
+  if (input.recoveryTo >= input.entryFrom) {
+    warnings.push(
+      'Recovery target top is at or above the entry zone bottom. The recovery target should sit below the entry zone.',
+    );
+  }
+
+  const sessionOptions = filterOptions?.sessions ?? [];
+  const syncOptions = filterOptions?.syncStatuses ?? [];
+
+  const stamp = () => new Date().toISOString();
+
+  return (
+    <div className="space-y-5">
+      {/* Explanation */}
+      <section className="card flex items-start gap-3 border-accent/30 bg-accent/5 p-4">
+        <AlertIcon className="mt-0.5 text-base text-accent" />
+        <p className="text-sm leading-relaxed text-ink">
+          This is not a trading signal. It only shows what happened historically
+          for this scenario, measured in gap points across the currently filtered
+          data. No orders, no money, no buy/sell recommendation.
+        </p>
+      </section>
+
+      {/* Inputs */}
+      <section className="card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="stat-label">Scenario Inputs</span>
+          <button
+            type="button"
+            onClick={() => {
+              setInput(DEFAULT_SCENARIO_INPUT);
+              setSelected(null);
+            }}
+            className="btn px-2 py-1"
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+          <NumField label="Entry Gap From" value={input.entryFrom} step={0.1} onChange={(entryFrom) => patch({ entryFrom })} />
+          <NumField label="Entry Gap To" value={input.entryTo} step={0.1} onChange={(entryTo) => patch({ entryTo })} />
+          <NumField label="Recovery Target From" value={input.recoveryFrom} step={0.1} onChange={(recoveryFrom) => patch({ recoveryFrom })} />
+          <NumField label="Recovery Target To" value={input.recoveryTo} step={0.1} onChange={(recoveryTo) => patch({ recoveryTo })} />
+          <NumField label="Stop Loss Gap" value={input.stopLoss} step={0.1} onChange={(stopLoss) => patch({ stopLoss })} />
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">Max Holding (min)</span>
+            <input
+              type="number"
+              step={1}
+              min={0}
+              placeholder="optional"
+              value={input.maxHoldingMinutes ?? ''}
+              onChange={(e) =>
+                patch({
+                  maxHoldingMinutes:
+                    e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+              className="w-full rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <NumField label="Minimum Events" value={input.minEvents} step={1} onChange={(minEvents) => patch({ minEvents })} />
+          <label className="flex flex-col gap-1">
+            <span className="stat-label">Same Day Only</span>
+            <button
+              type="button"
+              onClick={() => patch({ sameDayOnly: !input.sameDayOnly })}
+              className={[
+                'btn px-3 py-1.5',
+                input.sameDayOnly ? 'btn-active' : '',
+              ].join(' ')}
+            >
+              {input.sameDayOnly ? 'On' : 'Off'}
+            </button>
+          </label>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ChipMultiSelect
+            label="Session Filter"
+            options={sessionOptions}
+            selected={input.sessions}
+            onChange={(sessions) => patch({ sessions })}
+          />
+          <ChipMultiSelect
+            label="Sync Status Filter"
+            options={syncOptions}
+            selected={input.syncStatuses}
+            onChange={(syncStatuses) => patch({ syncStatuses })}
+          />
+        </div>
+      </section>
+
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <section className="space-y-2">
+          {warnings.map((w, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning"
+            >
+              <AlertIcon className="mt-0.5 text-base" />
+              <span>{w}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Export */}
+      <section className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => downloadExport(scenarioEventListCsv(result))}
+          className="btn px-3 py-1.5"
+        >
+          Export event list (CSV)
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadExport(scenarioSummaryJson(result, stamp()))}
+          className="btn px-3 py-1.5"
+        >
+          Export scenario summary (JSON)
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadExport(sensitivityCsv(sensitivity))}
+          className="btn px-3 py-1.5"
+        >
+          Export SL sensitivity (CSV)
+        </button>
+      </section>
+
+      <ScenarioCards result={result} />
+
+      {activeSelected && (
+        <ScenarioPathChart
+          samples={filteredSamples}
+          event={activeSelected}
+          input={input}
+        />
+      )}
+
+      <ScenarioCharts result={result} sensitivity={sensitivity} />
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <OutcomeBreakdownTable result={result} />
+        <SensitivityTable rows={sensitivity} currentSl={input.stopLoss} />
+      </div>
+
+      <ScenarioEventTable
+        events={result.events}
+        selectedId={activeSelected?.id ?? null}
+        onSelect={setSelected}
+      />
+    </div>
+  );
+}
