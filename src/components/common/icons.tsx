@@ -179,6 +179,16 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+export function CompareIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 5h6v14H4z" />
+      <path d="M14 5h6v14h-6z" />
+      <path d="M12 3v18" />
+    </svg>
+  );
+}
+
 export function RankIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

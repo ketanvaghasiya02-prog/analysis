@@ -14,6 +14,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useData } from '@/context/DataContext';
 import { useRepository } from '@/context/RepositoryContext';
 import { useStrategyFocus } from '@/context/StrategyFocusContext';
+import { useComparison } from '@/context/ComparisonContext';
 import {
   DEFAULT_RANKING_FILTERS,
   rankStrategies,
@@ -315,12 +316,13 @@ function RankingTable({
   onToggle: (key: string) => void;
   onOpen: (s: RankedStrategy) => void;
 }) {
+  const comparison = useComparison();
   return (
     <section className="card overflow-hidden">
       <header className="flex items-center gap-2 border-b border-panel-border px-5 py-3">
         <TableIcon className="text-base text-accent" />
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Ranked Strategies</h2>
-        <span className="ml-auto text-xs text-ink-faint">{fmtInt(ranked.length)} ranked · click a row for the score breakdown, Details for the full dossier</span>
+        <span className="ml-auto text-xs text-ink-faint">{fmtInt(ranked.length)} ranked · Details for the dossier · Compare to add to comparison</span>
       </header>
       <div className="max-h-[40rem] overflow-auto">
         <table className="w-full text-left text-sm">
@@ -372,16 +374,30 @@ function RankingTable({
                       {fmtNumber(s.scores.overall, 1)}
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpen(s);
-                        }}
-                        className="btn px-2 py-0.5 text-[11px]"
-                      >
-                        Details →
-                      </button>
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            comparison.toggle(r.key);
+                          }}
+                          disabled={!comparison.isSelected(r.key) && comparison.full}
+                          className={['btn px-2 py-0.5 text-[11px]', comparison.isSelected(r.key) ? 'btn-active' : ''].join(' ')}
+                          title="Add or remove from Strategy Comparison"
+                        >
+                          {comparison.isSelected(r.key) ? '✓' : '⇄'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen(s);
+                          }}
+                          className="btn px-2 py-0.5 text-[11px]"
+                        >
+                          Details →
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   {open && (

@@ -26,6 +26,7 @@ import { RepositoryView } from '@/components/repository/RepositoryView';
 import { StrategyRankingView } from '@/components/ranking/StrategyRankingView';
 import { StrategyDetailsView } from '@/components/details/StrategyDetailsView';
 import { ReplayView } from '@/components/replay/ReplayView';
+import { ComparisonView } from '@/components/comparison/ComparisonView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -72,6 +73,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ReplayView />
+      </AppLayout>
+    );
+  }
+
+  // Strategy Comparison reads stored results, so it is dataset-independent.
+  if (view === 'comparison') {
+    return (
+      <AppLayout>
+        <ComparisonView />
       </AppLayout>
     );
   }

@@ -9,6 +9,7 @@ import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
   ClockIcon,
+  CompareIcon,
   DatabaseIcon,
   FileIcon,
   FlaskIcon,
@@ -55,10 +56,11 @@ export function Sidebar() {
     { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
     { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
     { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
+    { id: 'comparison', label: 'Strategy Comparison', icon: CompareIcon },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 
-  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository', 'ranking']);
+  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository', 'ranking', 'comparison']);
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">

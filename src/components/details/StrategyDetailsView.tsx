@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { useData } from '@/context/DataContext';
 import { useRepository } from '@/context/RepositoryContext';
 import { useStrategyFocus } from '@/context/StrategyFocusContext';
+import { useComparison } from '@/context/ComparisonContext';
 import { buildDossier, dossierCsv, dossierJson, printDossierPdf } from '@/utils/strategyDossier';
 import type { OccurrenceRecord } from '@/utils/strategyExecution';
 import { OUTCOME_LABELS, type ScenarioOutcome } from '@/utils/scenario';
@@ -73,6 +74,7 @@ export function StrategyDetailsView() {
   const { setView } = useData();
   const { records } = useRepository();
   const { focus, setFocus } = useStrategyFocus();
+  const comparison = useComparison();
 
   const record = useMemo(
     () => (focus ? records.find((r) => r.key === focus.key) ?? null : null),
@@ -186,6 +188,15 @@ export function StrategyDetailsView() {
           ))}
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => comparison.toggle(record.key)}
+            disabled={!comparison.isSelected(record.key) && comparison.full}
+            className={['btn flex items-center gap-1.5 px-3 py-1.5 text-sm', comparison.isSelected(record.key) ? 'btn-active' : ''].join(' ')}
+            title="Add or remove this strategy from the Strategy Comparison selection"
+          >
+            {comparison.isSelected(record.key) ? '✓ In Compare' : '＋ Compare'}
+          </button>
           <button type="button" onClick={() => printDossierPdf(record, dossier, stamp())} className="btn flex items-center gap-1.5 px-3 py-1.5 text-sm">
             <DownloadIcon className="text-sm" /> PDF
           </button>

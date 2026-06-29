@@ -50,9 +50,11 @@ export function Header() {
                               ? 'Historical Strategy Details'
                               : view === 'replay'
                                 ? 'Historical Evidence Replay'
-                                : view === 'settings'
-                                  ? 'Settings'
-                                  : 'Gap Analysis Overview';
+                                : view === 'comparison'
+                                  ? 'Strategy Comparison'
+                                  : view === 'settings'
+                                    ? 'Settings'
+                                    : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =
