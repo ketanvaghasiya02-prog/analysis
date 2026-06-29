@@ -20,6 +20,7 @@ import { ExplorerView } from '@/components/explorer/ExplorerView';
 import { SessionView } from '@/components/session/SessionView';
 import { SettingsView } from '@/components/settings/SettingsView';
 import { ResearchLabView } from '@/components/lab/ResearchLabView';
+import { SlOptimizerView } from '@/components/sloptimizer/SlOptimizerView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -64,6 +65,8 @@ export function Dashboard() {
     content = <SessionView />;
   } else if (view === 'lab') {
     content = <ResearchLabView />;
+  } else if (view === 'sl-optimizer') {
+    content = <SlOptimizerView />;
   } else {
     content = <OverviewView />;
   }

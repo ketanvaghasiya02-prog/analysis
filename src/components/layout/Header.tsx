@@ -38,7 +38,9 @@ export function Header() {
                   ? 'Session Recovery & Risk'
                   : view === 'lab'
                     ? 'Research Lab — Scenario Testing'
-                    : view === 'settings'
+                    : view === 'sl-optimizer'
+                      ? 'Stop Loss Optimizer'
+                      : view === 'settings'
                       ? 'Settings'
                       : 'Gap Analysis Overview';
 

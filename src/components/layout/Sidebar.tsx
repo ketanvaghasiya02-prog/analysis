@@ -17,6 +17,7 @@ import {
   ReplayIcon,
   SettingsIcon,
   ShieldIcon,
+  SlidersIcon,
   TableIcon,
   TrashIcon,
   WarningIcon,
@@ -47,6 +48,7 @@ export function Sidebar() {
     { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
     { id: 'session', label: 'Session Analysis', icon: ClockIcon },
     { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
+    { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
 

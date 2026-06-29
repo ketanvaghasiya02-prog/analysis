@@ -59,6 +59,7 @@ export type AppView =
   | 'explorer'
   | 'session'
   | 'lab'
+  | 'sl-optimizer'
   | 'settings';
 
 interface DataContextValue {
