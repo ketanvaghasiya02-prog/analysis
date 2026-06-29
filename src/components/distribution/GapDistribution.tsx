@@ -1,18 +1,12 @@
 /**
- * Gap distribution module container (Phase R3).
+ * Gap distribution module container (Phase R3 + R4).
  *
- * Owns the bin-size setting and the selected-zone state, derives the gap zones
- * from the shared `filteredSamples`, and composes the histogram, selected-zone
- * panel and zone summary table so they stay in sync.
+ * Bin-size and selected-zone state now live in the data store so the Events
+ * page can share them. This container composes the histogram, selected-zone
+ * panel and zone summary table over the shared `gapZones`.
  */
 
-import { useEffect, useMemo, useState } from 'react';
 import { useData } from '@/context/DataContext';
-import {
-  buildGapZones,
-  DEFAULT_BIN_SIZE,
-  findZone,
-} from '@/utils/histogram';
 import { GapHistogram } from '@/components/distribution/GapHistogram';
 import { SelectedZonePanel } from '@/components/distribution/SelectedZonePanel';
 import { GapZoneTable } from '@/components/distribution/GapZoneTable';
@@ -20,34 +14,19 @@ import { GapZoneTable } from '@/components/distribution/GapZoneTable';
 const BIN_PRESETS = [0.1, 0.25, 0.5, 1, 2, 5];
 
 export function GapDistribution() {
-  const { filteredSamples } = useData();
-  const [binSize, setBinSize] = useState(DEFAULT_BIN_SIZE);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const {
+    filteredSamples,
+    gapBinSize,
+    setGapBinSize,
+    gapZones,
+    selectedZoneId,
+    selectedZone,
+    toggleZone,
+    selectZone,
+    events,
+  } = useData();
 
-  const zones = useMemo(
-    () => buildGapZones(filteredSamples, binSize),
-    [filteredSamples, binSize],
-  );
-
-  // Drop a stale selection when the zone set changes (bin size / filters) and
-  // the previously selected zone no longer exists.
-  useEffect(() => {
-    if (selectedId !== null && !findZone(zones, selectedId)) {
-      setSelectedId(null);
-    }
-  }, [zones, selectedId]);
-
-  const selectedZone = findZone(zones, selectedId);
-
-  const toggleZone = (id: string) =>
-    setSelectedId((cur) => (cur === id ? null : id));
-
-  const updateBinSize = (value: number) => {
-    if (Number.isFinite(value) && value > 0) {
-      setBinSize(value);
-      setSelectedId(null);
-    }
-  };
+  const gapSampleCount = filteredSamples.filter((s) => s.gap !== null).length;
 
   return (
     <div className="space-y-5">
@@ -59,8 +38,8 @@ export function GapDistribution() {
             type="number"
             min={0.01}
             step="any"
-            value={binSize}
-            onChange={(e) => updateBinSize(Number(e.target.value))}
+            value={gapBinSize}
+            onChange={(e) => setGapBinSize(Number(e.target.value))}
             className="w-28 rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
           />
         </div>
@@ -69,10 +48,10 @@ export function GapDistribution() {
             <button
               key={p}
               type="button"
-              onClick={() => updateBinSize(p)}
+              onClick={() => setGapBinSize(p)}
               className={[
                 'btn px-2 py-1',
-                binSize === p ? 'btn-active' : '',
+                gapBinSize === p ? 'btn-active' : '',
               ].join(' ')}
             >
               {p}
@@ -80,22 +59,23 @@ export function GapDistribution() {
           ))}
         </div>
         <span className="ml-auto text-xs text-ink-faint">
-          {zones.length} zone{zones.length === 1 ? '' : 's'} across{' '}
-          {filteredSamples.filter((s) => s.gap !== null).length.toLocaleString()}{' '}
-          gap samples
+          {gapZones.length} zone{gapZones.length === 1 ? '' : 's'} ·{' '}
+          {events.events.length.toLocaleString()} events across{' '}
+          {gapSampleCount.toLocaleString()} gap samples
         </span>
       </section>
 
       <GapHistogram
-        zones={zones}
-        selectedId={selectedId}
+        zones={gapZones}
+        selectedId={selectedZoneId}
         onSelect={toggleZone}
       />
-      <SelectedZonePanel zone={selectedZone} onClear={() => setSelectedId(null)} />
+      <SelectedZonePanel zone={selectedZone} onClear={() => selectZone(null)} />
       <GapZoneTable
-        zones={zones}
-        selectedId={selectedId}
+        zones={gapZones}
+        selectedId={selectedZoneId}
         onSelect={toggleZone}
+        eventCounts={events.countByZone}
       />
     </div>
   );

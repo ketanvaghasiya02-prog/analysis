@@ -24,6 +24,8 @@ interface GapZoneTableProps {
   zones: GapZone[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Optional per-zone event counts (keyed by zone id) to show an Events column. */
+  eventCounts?: Record<string, number>;
 }
 
 const DECIMALS = 3;
@@ -36,7 +38,12 @@ function SortIndicator({ dir }: { dir: false | 'asc' | 'desc' }) {
   );
 }
 
-export function GapZoneTable({ zones, selectedId, onSelect }: GapZoneTableProps) {
+export function GapZoneTable({
+  zones,
+  selectedId,
+  onSelect,
+  eventCounts,
+}: GapZoneTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'low', desc: false },
   ]);
@@ -81,6 +88,18 @@ export function GapZoneTable({ zones, selectedId, onSelect }: GapZoneTableProps)
         accessorKey: 'avgGap',
         cell: (c) => fmtNumber(c.getValue() as number | null, DECIMALS),
       },
+      ...(eventCounts
+        ? [
+            {
+              id: 'events',
+              header: 'Events',
+              accessorFn: (z: GapZone) => eventCounts[z.id] ?? 0,
+              cell: (c) => (
+                <span className="text-accent">{fmtInt(c.getValue() as number)}</span>
+              ),
+            } satisfies ColumnDef<GapZone>,
+          ]
+        : []),
       {
         header: 'Sessions',
         accessorKey: 'sessions',
@@ -101,7 +120,7 @@ export function GapZoneTable({ zones, selectedId, onSelect }: GapZoneTableProps)
         },
       },
     ],
-    [],
+    [eventCounts],
   );
 
   const filtered = useMemo(() => {

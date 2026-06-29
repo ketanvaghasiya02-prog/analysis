@@ -1,6 +1,6 @@
 /**
- * Left navigation sidebar: brand, upload control, loaded-file list and
- * day-bucket overview. Phase R1 has a single "Overview" view.
+ * Left navigation sidebar: brand, view navigation, upload control, loaded-file
+ * list and day-bucket overview.
  */
 
 import { useData } from '@/context/DataContext';
@@ -13,9 +13,26 @@ import {
   TableIcon,
   TrashIcon,
 } from '@/components/common/icons';
+import type { AppView } from '@/context/DataContext';
 
 export function Sidebar() {
-  const { dataset, validation, reset } = useData();
+  const { dataset, validation, reset, view, setView, hasData, events } =
+    useData();
+
+  const navItems: Array<{
+    id: AppView;
+    label: string;
+    icon: typeof TableIcon;
+    badge?: string;
+  }> = [
+    { id: 'overview', label: 'Overview', icon: TableIcon },
+    {
+      id: 'events',
+      label: 'Events',
+      icon: LayersIcon,
+      badge: hasData ? fmtInt(events.events.length) : undefined,
+    },
+  ];
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">
@@ -33,20 +50,32 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Nav */}
         <nav className="mb-5 space-y-1">
-          <div className="flex items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-accent">
-            <TableIcon className="text-base" />
-            Overview
-          </div>
-          <div
-            className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-faint"
-            title="Available in a later phase"
-          >
-            <LayersIcon className="text-base" />
-            Gap Analytics
-            <span className="ml-auto text-[10px] uppercase tracking-wide">
-              Soon
-            </span>
-          </div>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = view === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setView(item.id)}
+                disabled={!hasData && item.id !== 'overview'}
+                className={[
+                  'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'border border-accent/40 bg-accent/10 text-accent'
+                    : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
+                ].join(' ')}
+              >
+                <Icon className="text-base" />
+                {item.label}
+                {item.badge !== undefined && (
+                  <span className="ml-auto font-mono text-[11px] text-ink-faint">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Upload */}

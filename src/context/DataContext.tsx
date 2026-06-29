@@ -32,6 +32,15 @@ import {
   buildFilterOptions,
   EMPTY_FILTERS,
 } from '@/utils/filters';
+import {
+  buildGapZones,
+  DEFAULT_BIN_SIZE,
+  findZone,
+  type GapZone,
+} from '@/utils/histogram';
+import { detectZoneEvents, type EventDetectionResult } from '@/utils/events';
+
+export type AppView = 'overview' | 'events';
 
 interface DataContextValue {
   dataset: CombinedDataset | null;
@@ -46,6 +55,16 @@ interface DataContextValue {
   isParsing: boolean;
   hasData: boolean;
 
+  // Gap-zone state (shared by the distribution module and the events page).
+  gapBinSize: number;
+  gapZones: GapZone[];
+  selectedZoneId: string | null;
+  selectedZone: GapZone | null;
+  events: EventDetectionResult;
+
+  // Navigation.
+  view: AppView;
+
   addFiles: (files: File[]) => Promise<void>;
   reset: () => void;
 
@@ -56,6 +75,12 @@ interface DataContextValue {
   setFilters: (next: FilterState) => void;
   updateFilters: (patch: Partial<FilterState>) => void;
   resetFilters: () => void;
+
+  setGapBinSize: (size: number) => void;
+  selectZone: (id: string | null) => void;
+  toggleZone: (id: string) => void;
+
+  setView: (view: AppView) => void;
 }
 
 const DEFAULT_SELECTION: AnalysisSelection = {
@@ -71,6 +96,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [selection, setSelection] = useState<AnalysisSelection>(DEFAULT_SELECTION);
   const [filters, setFiltersState] = useState<FilterState>(EMPTY_FILTERS);
   const [isParsing, setIsParsing] = useState(false);
+  const [gapBinSize, setGapBinSizeState] = useState(DEFAULT_BIN_SIZE);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [view, setView] = useState<AppView>('overview');
 
   const addFiles = useCallback(
     async (files: File[]) => {
@@ -101,6 +129,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setDataset(null);
     setSelection(DEFAULT_SELECTION);
     setFiltersState(EMPTY_FILTERS);
+    setGapBinSizeState(DEFAULT_BIN_SIZE);
+    setSelectedZoneId(null);
+    setView('overview');
+  }, []);
+
+  const setGapBinSize = useCallback((size: number) => {
+    if (Number.isFinite(size) && size > 0) {
+      setGapBinSizeState(size);
+      // Zone identities change with the bin size; drop any stale selection.
+      setSelectedZoneId(null);
+    }
+  }, []);
+
+  const selectZone = useCallback((id: string | null) => {
+    setSelectedZoneId(id);
+  }, []);
+
+  const toggleZone = useCallback((id: string) => {
+    setSelectedZoneId((cur) => (cur === id ? null : id));
   }, []);
 
   const setFilters = useCallback((next: FilterState) => {
@@ -173,6 +220,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [activeSamples, filters],
   );
 
+  // Gap zones and zone events are derived once here and shared by the
+  // distribution module (Overview) and the Events page.
+  const gapZones = useMemo(
+    () => buildGapZones(filteredSamples, gapBinSize),
+    [filteredSamples, gapBinSize],
+  );
+
+  const selectedZone = useMemo(
+    () => findZone(gapZones, selectedZoneId),
+    [gapZones, selectedZoneId],
+  );
+
+  const events = useMemo(
+    () => detectZoneEvents(filteredSamples, gapZones),
+    [filteredSamples, gapZones],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       dataset,
@@ -184,6 +248,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       filterOptions,
       isParsing,
       hasData: !!dataset && dataset.samples.length > 0,
+      gapBinSize,
+      gapZones,
+      selectedZoneId,
+      selectedZone,
+      events,
+      view,
       addFiles,
       reset,
       setMode,
@@ -192,6 +262,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setFilters,
       updateFilters,
       resetFilters,
+      setGapBinSize,
+      selectZone,
+      toggleZone,
+      setView,
     }),
     [
       dataset,
@@ -202,6 +276,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       filters,
       filterOptions,
       isParsing,
+      gapBinSize,
+      gapZones,
+      selectedZoneId,
+      selectedZone,
+      events,
+      view,
       addFiles,
       reset,
       setMode,
@@ -210,6 +290,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setFilters,
       updateFilters,
       resetFilters,
+      setGapBinSize,
+      selectZone,
+      toggleZone,
     ],
   );
 
