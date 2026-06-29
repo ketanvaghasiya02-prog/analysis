@@ -58,11 +58,11 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 const OUTCOME_FILL: Record<string, string> = {
   RECOVERED_BEFORE_SL: '#34d399',
-  SL_HIT_THEN_RECOVERED: '#fbbf24',
-  SL_HIT_NOT_RECOVERED: '#f87171',
-  DAY_END_NO_RESOLUTION: '#64748b',
-  DATASET_END_NO_RESOLUTION: '#475569',
-  MAX_HOLDING_EXPIRED: '#64748b',
+  RECOVERED_AFTER_SL: '#fbbf24',
+  SL_NOT_RECOVERED: '#f87171',
+  DAY_END: '#64748b',
+  DATASET_END: '#475569',
+  HOLDING_TIME_EXPIRED: '#64748b',
 };
 
 function buildAdverseBins(events: ScenarioEvent[], binCount = 16) {

@@ -110,7 +110,7 @@ export function ResearchLabView() {
   const warnings: string[] = [];
   if (result.validEvents < input.minEvents) {
     warnings.push(
-      `Only ${result.validEvents} valid events — below the minimum of ${input.minEvents}. Results are low-confidence.`,
+      `Only ${result.validEvents} positions — below the minimum of ${input.minEvents}. Results are low-confidence.`,
     );
   }
   if (input.stopLoss <= input.entryGap) {
@@ -372,9 +372,9 @@ export function ResearchLabView() {
         <div className="flex items-start gap-3 rounded-lg border border-negative/40 bg-negative/10 p-3 text-sm text-negative">
           <AlertIcon className="mt-0.5 text-base" />
           <span>
-            Outcome accounting mismatch — outcomes sum to{' '}
+            Outcome Accounting Failed — outcomes sum to{' '}
             {fmtInt(result.outcomeTotal)} but there are {fmtInt(result.validEvents)}{' '}
-            events.
+            positions.
           </span>
         </div>
       )}
@@ -418,7 +418,7 @@ export function ResearchLabView() {
               <span className="text-ink">{fmtInt(result.outcomeTotal)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-sans text-ink-muted">Total events</span>
+              <span className="font-sans text-ink-muted">Total positions</span>
               <span className="text-ink">{fmtInt(result.validEvents)}</span>
             </div>
             <div className="flex items-center justify-between">

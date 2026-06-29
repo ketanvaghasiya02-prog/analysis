@@ -42,25 +42,26 @@ export function ScenarioHelpPanel() {
       {open && (
         <div className="border-t border-panel-border px-5 py-4 text-sm text-ink-muted">
           <p className="text-xs text-ink-faint">
-            Exact-touch model: an event starts on the first touch of the Entry
-            Gap from below; after entry, every future sample is scanned in
-            chronological order and the FIRST of recovery or stop-loss decides
-            the path. Research education only — not a trading signal.
+            This Research Lab simulates ONE position at a time. A position opens
+            on the first touch of the Entry Gap from below; while it is open,
+            every new Entry Gap touch is ignored. After entry, each future sample
+            is scanned in chronological order and the FIRST of recovery or
+            stop-loss decides the path. Research education only — not a trading
+            signal, gap points only.
           </p>
 
           <H>Worked examples</H>
           <p className="mt-1">
-            Scenario: Entry Gap = 18.00, Recovery Gap = 15.50, Stop Loss = 21.00.
+            Scenario: Entry Gap = 14.00, Recovery Gap = 13.50, Stop Loss = 14.44.
           </p>
           <Code>{`Example 1  (SL hit, then recovered)
-  entry on first touch of 18.00 (gap 18.02)
-  path: 18.02 → 20.40 → 21.00 (SL HIT) → 17.20 → 15.50 (recovered)
+  13.98 → 14.02 (ENTRY) → 14.20 → 14.46 (SL HIT) → 14.10 → 13.50 (RECOVERY)
   SL happened first, recovery happened later
   →  RECOVERED_AFTER_SL
+  Meaning: the gap eventually recovered, but the SL was too tight.
 
 Example 2  (recovered cleanly)
-  entry on first touch of 18.00
-  path: 18.00 → 17.60 → 16.20 → 15.50 (recovered)
+  13.98 → 14.01 (ENTRY) → 13.80 → 13.50 (RECOVERY)
   recovery reached, SL never touched
   →  RECOVERED_BEFORE_SL`}</Code>
 
@@ -72,7 +73,7 @@ Recovery Ignoring SL %  = (Recovered Before SL + Recovered After SL) / Total × 
 SL Hit %                = (Recovered After SL + SL Not Recovered) / Total × 100
 Unresolved %            = (Day End + Dataset End + Holding Expired) / Total × 100`}</Code>
 
-          <H>Numeric example (Total Events = 100)</H>
+          <H>Numeric example (Total Positions = 100)</H>
           <Code>{`Recovered Before SL    = 62
 Recovered After SL     = 25
 SL Not Recovered       = 8
@@ -89,7 +90,7 @@ Unresolved %            = (3 + 2 + 0) / 100 = 5%`}</Code>
           <H>Interpretation</H>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
             <li>Without SL, historical recovery was 87%.</li>
-            <li>With SL at 19.00, practical success was only 62%.</li>
+            <li>With SL at 14.44, practical success was only 62%.</li>
             <li>
               25% hit SL first but recovered later — the SL may be too tight.
             </li>

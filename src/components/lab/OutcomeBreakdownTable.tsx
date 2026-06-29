@@ -9,11 +9,11 @@ import { TableIcon } from '@/components/common/icons';
 
 const TONE: Record<string, string> = {
   RECOVERED_BEFORE_SL: 'text-positive',
-  SL_HIT_THEN_RECOVERED: 'text-warning',
-  SL_HIT_NOT_RECOVERED: 'text-negative',
-  DAY_END_NO_RESOLUTION: 'text-ink-muted',
-  DATASET_END_NO_RESOLUTION: 'text-ink-muted',
-  MAX_HOLDING_EXPIRED: 'text-ink-muted',
+  RECOVERED_AFTER_SL: 'text-warning',
+  SL_NOT_RECOVERED: 'text-negative',
+  DAY_END: 'text-ink-muted',
+  DATASET_END: 'text-ink-muted',
+  HOLDING_TIME_EXPIRED: 'text-ink-muted',
 };
 
 export function OutcomeBreakdownTable({ result }: { result: ScenarioResult }) {

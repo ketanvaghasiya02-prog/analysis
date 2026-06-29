@@ -22,11 +22,11 @@ import { TableIcon } from '@/components/common/icons';
 
 const OUTCOME_TONE: Record<ScenarioOutcome, string> = {
   RECOVERED_BEFORE_SL: 'text-positive',
-  SL_HIT_THEN_RECOVERED: 'text-warning',
-  SL_HIT_NOT_RECOVERED: 'text-negative',
-  DAY_END_NO_RESOLUTION: 'text-ink-muted',
-  DATASET_END_NO_RESOLUTION: 'text-ink-muted',
-  MAX_HOLDING_EXPIRED: 'text-ink-muted',
+  RECOVERED_AFTER_SL: 'text-warning',
+  SL_NOT_RECOVERED: 'text-negative',
+  DAY_END: 'text-ink-muted',
+  DATASET_END: 'text-ink-muted',
+  HOLDING_TIME_EXPIRED: 'text-ink-muted',
 };
 
 function SortIndicator({ dir }: { dir: false | 'asc' | 'desc' }) {
@@ -52,13 +52,19 @@ export function ScenarioEventTable({
 
   const columns = useMemo<ColumnDef<ScenarioEvent>[]>(
     () => [
-      { header: 'Event ID', accessorKey: 'id' },
-      { header: 'Date', accessorKey: 'date' },
+      { header: 'Position ID', accessorKey: 'id' },
+      { header: 'Entry Date', accessorKey: 'date' },
       { header: 'Entry Time', accessorKey: 'entryTime' },
       {
         header: 'Entry Gap',
         accessorKey: 'entryGap',
         cell: (c) => fmtNumber(c.getValue() as number, 3),
+      },
+      { header: 'Exit Time', accessorKey: 'exitTime' },
+      {
+        header: 'Exit Gap',
+        accessorKey: 'exitGap',
+        cell: (c) => fmtNumber(c.getValue() as number | null, 3),
       },
       {
         header: 'Max Gap After Entry',
@@ -79,23 +85,37 @@ export function ScenarioEventTable({
         ),
       },
       {
-        id: 'maxAdverse',
-        header: 'Max Adverse Gap',
-        accessorFn: (e) => e.maxGap - e.entryGap,
-        cell: (c) => (
-          <span className="text-warning">
-            {fmtNumber(c.getValue() as number, 3)}
-          </span>
-        ),
-      },
-      {
-        header: 'Recovery Time',
-        accessorKey: 'recoveryTimeSec',
-        cell: (c) => fmtDuration(c.getValue() as number | null),
+        header: 'SL Hit',
+        accessorKey: 'slHit',
+        cell: (c) => {
+          const v = c.getValue() as boolean;
+          return (
+            <span className={v ? 'text-negative' : 'text-ink-faint'}>
+              {v ? 'Yes' : 'No'}
+            </span>
+          );
+        },
       },
       {
         header: 'SL Time',
         accessorKey: 'slHitTimeSec',
+        cell: (c) => fmtDuration(c.getValue() as number | null),
+      },
+      {
+        header: 'Recovery Hit',
+        accessorKey: 'recoveryHit',
+        cell: (c) => {
+          const v = c.getValue() as boolean;
+          return (
+            <span className={v ? 'text-positive' : 'text-ink-faint'}>
+              {v ? 'Yes' : 'No'}
+            </span>
+          );
+        },
+      },
+      {
+        header: 'Recovery Time',
+        accessorKey: 'recoveryTimeSec',
         cell: (c) => fmtDuration(c.getValue() as number | null),
       },
       {
@@ -142,16 +162,16 @@ export function ScenarioEventTable({
       <header className="flex items-center gap-2 border-b border-panel-border px-5 py-3">
         <TableIcon className="text-base text-accent" />
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">
-          Event List
+          Position Table
         </h2>
         <span className="ml-auto text-xs text-ink-faint">
-          {fmtInt(events.length)} events · click a row to view its path
+          {fmtInt(events.length)} positions · click a row to view its path
         </span>
       </header>
 
       {events.length === 0 ? (
         <div className="p-6 text-center text-sm text-ink-muted">
-          No events match this scenario.
+          No positions match this scenario.
         </div>
       ) : (
         <div className="max-h-[28rem] overflow-auto">

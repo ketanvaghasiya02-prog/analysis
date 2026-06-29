@@ -35,9 +35,9 @@ export interface ScenarioInput {
 }
 
 export const DEFAULT_SCENARIO_INPUT: ScenarioInput = {
-  entryGap: 18.0,
-  recoveryGap: 15.5,
-  stopLoss: 19.0,
+  entryGap: 14.0,
+  recoveryGap: 13.5,
+  stopLoss: 14.44,
   maxHoldingMinutes: null,
   sameDayOnly: true,
   sessions: [],
@@ -47,28 +47,28 @@ export const DEFAULT_SCENARIO_INPUT: ScenarioInput = {
 
 export type ScenarioOutcome =
   | 'RECOVERED_BEFORE_SL'
-  | 'SL_HIT_THEN_RECOVERED'
-  | 'SL_HIT_NOT_RECOVERED'
-  | 'DAY_END_NO_RESOLUTION'
-  | 'DATASET_END_NO_RESOLUTION'
-  | 'MAX_HOLDING_EXPIRED';
+  | 'RECOVERED_AFTER_SL'
+  | 'SL_NOT_RECOVERED'
+  | 'DAY_END'
+  | 'DATASET_END'
+  | 'HOLDING_TIME_EXPIRED';
 
 export const OUTCOME_LABELS: Record<ScenarioOutcome, string> = {
   RECOVERED_BEFORE_SL: 'Recovered before SL',
-  SL_HIT_THEN_RECOVERED: 'SL hit then recovered',
-  SL_HIT_NOT_RECOVERED: 'SL hit not recovered',
-  DAY_END_NO_RESOLUTION: 'Day end no resolution',
-  DATASET_END_NO_RESOLUTION: 'Dataset end no resolution',
-  MAX_HOLDING_EXPIRED: 'Max holding expired',
+  RECOVERED_AFTER_SL: 'Recovered after SL',
+  SL_NOT_RECOVERED: 'SL not recovered',
+  DAY_END: 'Day end',
+  DATASET_END: 'Dataset end',
+  HOLDING_TIME_EXPIRED: 'Holding time expired',
 };
 
 export const OUTCOME_ORDER: ScenarioOutcome[] = [
   'RECOVERED_BEFORE_SL',
-  'SL_HIT_THEN_RECOVERED',
-  'SL_HIT_NOT_RECOVERED',
-  'DAY_END_NO_RESOLUTION',
-  'DATASET_END_NO_RESOLUTION',
-  'MAX_HOLDING_EXPIRED',
+  'RECOVERED_AFTER_SL',
+  'SL_NOT_RECOVERED',
+  'DAY_END',
+  'DATASET_END',
+  'HOLDING_TIME_EXPIRED',
 ];
 
 type TerminalReason = 'recovery' | 'day' | 'holding' | 'dataset';
@@ -81,6 +81,10 @@ export interface ScenarioEvent {
   date: string;
   entryTime: string;
   entryGap: number;
+  /** ServerTime of the sample that closed the position. */
+  exitTime: string;
+  /** Gap value at the close sample. */
+  exitGap: number | null;
   /** Highest gap reached after entry within the scan window. */
   maxGap: number;
   /** Lowest gap reached after entry within the scan window. */
@@ -143,18 +147,18 @@ export interface ScenarioResult {
 
   counts: Record<ScenarioOutcome, number>;
   recoveredBeforeSl: number;
-  slHitThenRecovered: number;
-  slHitNotRecovered: number;
-  dayEndNoResolution: number;
-  datasetEndNoResolution: number;
-  maxHoldingExpired: number;
+  recoveredAfterSl: number;
+  slNotRecovered: number;
+  dayEnd: number;
+  datasetEnd: number;
+  holdingExpired: number;
   unresolved: number;
 
   recoveryPctIgnoringSl: number;
   recoveryBeforeSlPct: number;
-  /** SL Hit % = (SL hit then recovered + SL hit not recovered) / total. */
+  /** SL Hit % = (Recovered After SL + SL Not Recovered) / total. */
   slHitPct: number;
-  /** Recovery After SL % = SL hit then recovered / total. */
+  /** Recovery After SL % = Recovered After SL / total. */
   recoveredAfterSlPct: number;
   unresolvedPct: number;
 
@@ -168,6 +172,8 @@ export interface ScenarioResult {
 
   adverse: DistributionStats;
   favorable: { avg: number | null; median: number | null; best: number | null };
+  minGapStats: { avg: number | null; best: number | null };
+  adverseExpansionStats: { avg: number | null; worst: number | null };
 
   entryGapAvg: number | null;
   riskReward: { reward: number; risk: number; rr: number | null } | null;
@@ -198,18 +204,18 @@ export function classifyAtSl(
 ): ScenarioOutcome {
   if (event.recovered) {
     // Recovered: did the gap touch the SL level before recovering?
-    return event.maxGap >= sl - EPS
-      ? 'SL_HIT_THEN_RECOVERED'
-      : 'RECOVERED_BEFORE_SL';
+    return event.maxGap >= sl - EPS ? 'RECOVERED_AFTER_SL' : 'RECOVERED_BEFORE_SL';
   }
-  if (event.maxGap >= sl - EPS) return 'SL_HIT_NOT_RECOVERED';
+  // Not recovered: if SL was hit, it's SL not recovered regardless of why the
+  // scan stopped; otherwise the terminal reason decides.
+  if (event.maxGap >= sl - EPS) return 'SL_NOT_RECOVERED';
   switch (event.terminal) {
     case 'day':
-      return 'DAY_END_NO_RESOLUTION';
+      return 'DAY_END';
     case 'holding':
-      return 'MAX_HOLDING_EXPIRED';
+      return 'HOLDING_TIME_EXPIRED';
     default:
-      return 'DATASET_END_NO_RESOLUTION';
+      return 'DATASET_END';
   }
 }
 
@@ -240,22 +246,39 @@ export function computeScenario(
   let counter = 0;
   const n = samples.length;
 
-  for (let i = 1; i < n; i += 1) {
+  // POSITION-BASED scan: only one simulated research position may be open at a
+  // time. After an entry, every new Entry Gap cross is ignored until the open
+  // position closes (recovery / SL-not-recovered / day end / dataset end /
+  // holding expired). We then resume scanning from the close index, so repeated
+  // touches inside the same open position never create extra positions.
+  let i = 1;
+  while (i < n) {
     const prev = samples[i - 1]!;
     const cur = samples[i]!;
-    if (prev.gap === null || cur.gap === null) continue;
+    if (prev.gap === null || cur.gap === null) {
+      i += 1;
+      continue;
+    }
 
-    // Entry: FIRST TOUCH of the entry gap from below. A new entry is only
-    // possible after the gap has fallen back below the level (prev < entryLevel),
-    // which prevents duplicate entries while the gap stays at/above it.
+    // Entry: FIRST TOUCH of the entry gap from below.
     const isEntry = prev.gap < entryLevel && cur.gap >= entryLevel - EPS;
-    if (!isEntry) continue;
+    if (!isEntry) {
+      i += 1;
+      continue;
+    }
+
+    // Lab-specific session / sync filters on the entry sample: a filtered-out
+    // touch does not open a position.
+    if (sessionSet && !sessionSet.has(cur.currentSession)) {
+      i += 1;
+      continue;
+    }
+    if (syncSet && !syncSet.has(cur.syncStatus)) {
+      i += 1;
+      continue;
+    }
 
     totalEvents += 1;
-
-    // Lab-specific session / sync filters on the entry sample.
-    if (sessionSet && !sessionSet.has(cur.currentSession)) continue;
-    if (syncSet && !syncSet.has(cur.syncStatus)) continue;
 
     const entryDay = cur.dayKey;
     const entryGap = cur.gap;
@@ -288,6 +311,7 @@ export function computeScenario(
       }
       if (s.gap === null) continue;
 
+      // 1) max, 2) min, 3) SL-hit time, 4) recovery — chronological order.
       lastIndex = j;
       if (tsec !== null) lastTimeSec = tsec;
       if (s.gap > maxGap) maxGap = s.gap;
@@ -305,23 +329,26 @@ export function computeScenario(
 
     const outcome = classifyAtSl({ recovered, maxGap, terminal }, stopLoss);
     const slHit = maxGap >= stopLoss - EPS;
-    const slInvolved =
-      outcome === 'SL_HIT_NOT_RECOVERED' || outcome === 'SL_HIT_THEN_RECOVERED';
+    const exitIndex =
+      recovered && recoveryIndex !== null ? recoveryIndex : lastIndex;
+    const exitSample = samples[exitIndex]!;
     const durationSec = recovered
       ? recoveryTimeSec
-      : outcome === 'SL_HIT_NOT_RECOVERED'
-        ? firstSlHitSec
+      : outcome === 'SL_NOT_RECOVERED'
+        ? firstSlHitSec ?? lastTimeSec
         : lastTimeSec;
 
     counter += 1;
     events.push({
-      id: `RL-${String(counter).padStart(4, '0')}`,
+      id: `POS-${String(counter).padStart(4, '0')}`,
       startIndex: i,
-      endIndex: recovered && recoveryIndex !== null ? recoveryIndex : lastIndex,
+      endIndex: exitIndex,
       recoveryIndex,
       date: entryDay,
       entryTime: cur.serverTime,
       entryGap,
+      exitTime: exitSample.serverTime,
+      exitGap: exitSample.gap,
       maxGap,
       minGap,
       favorableMove: entryGap - minGap,
@@ -329,13 +356,16 @@ export function computeScenario(
       recoveryHit: recovered,
       slHit,
       recoveryTimeSec,
-      slHitTimeSec: slInvolved ? firstSlHitSec : null,
+      slHitTimeSec: slHit ? firstSlHitSec : null,
       durationSec,
       terminal,
       outcome,
       session: cur.currentSession,
       syncStatus: cur.syncStatus,
     });
+
+    // Resume AFTER the close — one position at a time.
+    i = exitIndex + 1;
   }
 
   return summariseScenario(events, totalEvents, input, samples);
@@ -349,19 +379,16 @@ function summariseScenario(
 ): ScenarioResult {
   const counts: Record<ScenarioOutcome, number> = {
     RECOVERED_BEFORE_SL: 0,
-    SL_HIT_THEN_RECOVERED: 0,
-    SL_HIT_NOT_RECOVERED: 0,
-    DAY_END_NO_RESOLUTION: 0,
-    DATASET_END_NO_RESOLUTION: 0,
-    MAX_HOLDING_EXPIRED: 0,
+    RECOVERED_AFTER_SL: 0,
+    SL_NOT_RECOVERED: 0,
+    DAY_END: 0,
+    DATASET_END: 0,
+    HOLDING_TIME_EXPIRED: 0,
   };
   for (const e of events) counts[e.outcome] += 1;
 
   const valid = events.length;
-  const unresolved =
-    counts.DAY_END_NO_RESOLUTION +
-    counts.DATASET_END_NO_RESOLUTION +
-    counts.MAX_HOLDING_EXPIRED;
+  const unresolved = counts.DAY_END + counts.DATASET_END + counts.HOLDING_TIME_EXPIRED;
 
   // Accounting: every event must land in exactly one outcome.
   const outcomeTotal = OUTCOME_ORDER.reduce((a, o) => a + counts[o], 0);
@@ -384,6 +411,20 @@ function summariseScenario(
         : null,
     median: percentile(favorableValues, 50),
     best: favorableValues.length > 0 ? Math.max(...favorableValues) : null,
+  };
+
+  const mean = (vals: number[]): number | null =>
+    vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  const minGaps = events.map((e) => e.minGap);
+  const adverseExpansions = events.map((e) => e.maxGap - e.entryGap);
+  const minGapStats = {
+    avg: mean(minGaps),
+    // "Best" min gap = the lowest gap reached (deepest favorable move).
+    best: minGaps.length ? Math.min(...minGaps) : null,
+  };
+  const adverseExpansionStats = {
+    avg: mean(adverseExpansions),
+    worst: adverseExpansions.length ? Math.max(...adverseExpansions) : null,
   };
 
   const entryGapAvg =
@@ -432,18 +473,18 @@ function summariseScenario(
     validEvents: valid,
     counts,
     recoveredBeforeSl: counts.RECOVERED_BEFORE_SL,
-    slHitThenRecovered: counts.SL_HIT_THEN_RECOVERED,
-    slHitNotRecovered: counts.SL_HIT_NOT_RECOVERED,
-    dayEndNoResolution: counts.DAY_END_NO_RESOLUTION,
-    datasetEndNoResolution: counts.DATASET_END_NO_RESOLUTION,
-    maxHoldingExpired: counts.MAX_HOLDING_EXPIRED,
+    recoveredAfterSl: counts.RECOVERED_AFTER_SL,
+    slNotRecovered: counts.SL_NOT_RECOVERED,
+    dayEnd: counts.DAY_END,
+    datasetEnd: counts.DATASET_END,
+    holdingExpired: counts.HOLDING_TIME_EXPIRED,
     unresolved,
     recoveryPctIgnoringSl: pct(
-      counts.RECOVERED_BEFORE_SL + counts.SL_HIT_THEN_RECOVERED,
+      counts.RECOVERED_BEFORE_SL + counts.RECOVERED_AFTER_SL,
     ),
     recoveryBeforeSlPct: pct(counts.RECOVERED_BEFORE_SL),
-    slHitPct: pct(counts.SL_HIT_THEN_RECOVERED + counts.SL_HIT_NOT_RECOVERED),
-    recoveredAfterSlPct: pct(counts.SL_HIT_THEN_RECOVERED),
+    slHitPct: pct(counts.RECOVERED_AFTER_SL + counts.SL_NOT_RECOVERED),
+    recoveredAfterSlPct: pct(counts.RECOVERED_AFTER_SL),
     unresolvedPct,
     outcomeTotal,
     accountingOk,
@@ -452,6 +493,8 @@ function summariseScenario(
     maxRecoveryTimeSec: recTimeSummary.max,
     adverse,
     favorable,
+    minGapStats,
+    adverseExpansionStats,
     entryGapAvg,
     riskReward,
     confidence: {
@@ -501,10 +544,10 @@ export function computeSensitivity(
         case 'RECOVERED_BEFORE_SL':
           recoveredWithout += 1;
           break;
-        case 'SL_HIT_THEN_RECOVERED':
+        case 'RECOVERED_AFTER_SL':
           recoveredStopped += 1; // a recovery this SL would have stopped
           break;
-        case 'SL_HIT_NOT_RECOVERED':
+        case 'SL_NOT_RECOVERED':
           slHit += 1;
           failedCut += 1; // a non-recovering event this SL would have cut
           break;

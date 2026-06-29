@@ -75,19 +75,13 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
           tooltip="Stop-loss is the first time the gap touches at or above this level after entry."
         />
         <Card
-          label="Total Events"
+          label="Total Positions"
           value={fmtInt(result.validEvents)}
           tooltip={
-            'Definition: every entry event that was analysed (passing session/sync filters).\n' +
-            'Formula: count of detected first-touch entries that were classified.\n' +
-            (result.totalEvents !== result.validEvents
-              ? `Note: ${result.totalEvents} detected, ${result.validEvents} analysed after filters.`
-              : 'Each event gets exactly one final outcome.')
-          }
-          hint={
-            result.totalEvents !== result.validEvents
-              ? `${fmtInt(result.totalEvents)} detected`
-              : undefined
+            'Definition: simulated research positions opened (one at a time).\n' +
+            'Only the first touch of the Entry Gap opens a position; repeated\n' +
+            'touches while a position is open are ignored. Each position has\n' +
+            'exactly one final outcome.'
           }
         />
       </section>
@@ -195,9 +189,31 @@ export function ScenarioCards({ result }: { result: ScenarioResult }) {
           value={fmtNumber(result.adverse.worst, 3)}
           tone="text-negative"
           tooltip={
-            'Definition: the largest gap any event reached after entry.\n' +
-            'Formula: max of max-gap-after-entry across events.'
+            'Definition: the largest gap any position reached after entry.\n' +
+            'Formula: max of max-gap-after-entry across positions.'
           }
+        />
+        <Card
+          label="Avg Min Gap After Entry"
+          value={fmtNumber(result.minGapStats.avg, 3)}
+          tooltip="Average of the lowest gap reached after entry, across positions."
+        />
+        <Card
+          label="Best Min Gap After Entry"
+          value={fmtNumber(result.minGapStats.best, 3)}
+          tone="text-positive"
+          tooltip="The deepest favorable move — the single lowest gap reached after any entry."
+        />
+        <Card
+          label="Avg Adverse Expansion"
+          value={fmtNumber(result.adverseExpansionStats.avg, 3)}
+          tooltip="Average of (max gap after entry − entry gap) — how far the gap typically moved against recovery."
+        />
+        <Card
+          label="Worst Adverse Expansion"
+          value={fmtNumber(result.adverseExpansionStats.worst, 3)}
+          tone="text-negative"
+          tooltip="The largest (max gap after entry − entry gap) across positions."
         />
         <Card
           label="Risk / Reward (gap pts)"
