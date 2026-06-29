@@ -12,6 +12,7 @@ import {
   computeScenario,
   computeSensitivity,
   DEFAULT_SCENARIO_INPUT,
+  RESEARCH_ENGINE_VERSION,
   scenarioEventListCsv,
   scenarioSummaryJson,
   sensitivityCsv,
@@ -141,6 +142,13 @@ export function ResearchLabView() {
 
   return (
     <div className="space-y-5">
+      {/* Engine version label */}
+      <div className="flex items-center gap-2">
+        <span className="chip border-positive/40 text-positive">
+          {RESEARCH_ENGINE_VERSION}
+        </span>
+      </div>
+
       {/* Explanation */}
       <section className="card flex items-start gap-3 border-accent/30 bg-accent/5 p-4">
         <AlertIcon className="mt-0.5 text-base text-accent" />

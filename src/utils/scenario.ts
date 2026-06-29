@@ -219,7 +219,29 @@ export function classifyAtSl(
   }
 }
 
+/**
+ * Research Engine v1.0
+ *
+ * Verified manually against CSV:
+ * - Scenario 1 matched
+ * - Scenario 2 matched
+ * - Scenario 3 matched
+ *
+ * Validation completed.
+ *
+ * Core rules:
+ * - Exact touch entry
+ * - One simulated position at a time
+ * - First touch recovery
+ * - First touch stop loss
+ * - Chronological row-by-row scan
+ * - Every position must have exactly one final outcome
+ *
+ * Do not modify this core calculation logic unless a bug is proven by CSV validation.
+ */
 /** Runs the scenario over the (already filtered) sample array. */
+export const RESEARCH_ENGINE_VERSION = 'Research Engine v1.0 — CSV validated';
+
 export function computeScenario(
   samples: GapSample[],
   input: ScenarioInput,
