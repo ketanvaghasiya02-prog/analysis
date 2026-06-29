@@ -1,12 +1,14 @@
 /**
- * Historical Strategy Finder — Foundation Mode (Phase 11A).
+ * Historical Strategy Finder — Research Execution (Phase 11B).
  *
- * Generates and validates research parameter combinations. It does NOT execute
- * the Research Engine, and computes no recovery / score / ranking. The
- * generation pass is memoized and reused until the inputs change.
+ * Phase 11A (parameter generation + validation) is unchanged and frozen. This
+ * phase adds the execution layer: it runs the FROZEN Research Engine v1.0
+ * sequentially for every READY combination, with caching, a live progress
+ * panel, pause / resume / stop, per-strategy error isolation and a live results
+ * table.
  *
- * This is a research parameter builder — never a trading signal or
- * recommendation.
+ * It NEVER ranks, scores, compares or recommends — it only executes historical
+ * research and stores the results.
  */
 
 import { useMemo, useState, type ReactNode } from 'react';
@@ -16,23 +18,18 @@ import {
   generateStrategies,
   MAX_COMBINATIONS,
   type NumericRange,
-  type StrategyCombination,
   type StrategyFinderInput,
-  type StrategyStatus,
 } from '@/utils/strategyFinder';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { StatCard } from '@/components/overview/StatCard';
-import { fmtInt, fmtNumber } from '@/utils/format';
-import { AlertIcon, TableIcon, TargetIcon } from '@/components/common/icons';
-
-const ROW_RENDER_CAP = 500;
-
-const STATUS_STYLE: Record<StrategyStatus, string> = {
-  PENDING: 'bg-ink-faint/15 text-ink-faint',
-  READY: 'bg-positive/20 text-positive',
-  INVALID: 'bg-negative/20 text-negative',
-  DUPLICATE: 'bg-warning/20 text-warning',
-};
+import { fmtInt } from '@/utils/format';
+import { AlertIcon, TargetIcon } from '@/components/common/icons';
+import { useStrategyExecution } from '@/components/strategyfinder/useStrategyExecution';
+import {
+  StrategyExecutionPanel,
+  StrategyExecutionSummary,
+} from '@/components/strategyfinder/StrategyExecutionPanel';
+import { StrategyResultsTable } from '@/components/strategyfinder/StrategyResultsTable';
 
 function NumField({
   label,
@@ -88,23 +85,36 @@ function SummaryCard({ label, value, tone, tooltip }: { label: string; value: Re
 }
 
 export function StrategyFinderView() {
-  const { filterOptions } = useData();
+  const { filterOptions, filteredSamples } = useData();
   const [input, setInput] = useState<StrategyFinderInput>(DEFAULT_STRATEGY_FINDER_INPUT);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | StrategyStatus>('ALL');
 
   const patch = (p: Partial<StrategyFinderInput>) => setInput((prev) => ({ ...prev, ...p }));
 
-  // Single memoized generation pass — reused until the inputs change.
+  // Phase 11A: single memoized generation + validation pass.
   const result = useMemo(() => generateStrategies(input), [input]);
 
+  // Only READY combinations are executable.
+  const readyCombos = useMemo(
+    () => result.combinations.filter((c) => c.status === 'READY'),
+    [result],
+  );
+
+  // Apply this page's date range to the (already globally-filtered) samples.
+  // Sessions / same-day are applied by the Research Engine per combination.
+  const dateFilteredSamples = useMemo(() => {
+    const { from, to } = input.dateRange;
+    if (!from && !to) return filteredSamples;
+    return filteredSamples.filter((s) => {
+      if (from && s.dayKey < from) return false;
+      if (to && s.dayKey > to) return false;
+      return true;
+    });
+  }, [filteredSamples, input.dateRange]);
+
+  // Phase 11B: execution controller (sequential, cached, interruptible).
+  const exec = useStrategyExecution(readyCombos, dateFilteredSamples, input.minTrades);
+
   const sessionOptions = filterOptions?.sessions ?? [];
-
-  const filtered = useMemo(() => {
-    if (statusFilter === 'ALL') return result.combinations;
-    return result.combinations.filter((c) => c.status === statusFilter);
-  }, [result.combinations, statusFilter]);
-
-  const shown = filtered.slice(0, ROW_RENDER_CAP);
 
   const warnings: string[] = [];
   if (result.summary.generated === 0) {
@@ -116,19 +126,23 @@ export function StrategyFinderView() {
   if (result.summary.generated > 0 && result.summary.valid === 0) {
     warnings.push('Every combination was rejected by validation. Recovery must be below Entry, and Stop Loss above Entry (and above Recovery).');
   }
+  if (readyCombos.length > 0 && dateFilteredSamples.length === 0) {
+    warnings.push('The current date range leaves no samples to research. Widen the date range.');
+  }
 
   return (
     <div className="space-y-5">
-      {/* Foundation banner */}
+      {/* Banner */}
       <section className="card flex items-start gap-3 border-accent/30 bg-accent/5 p-4">
         <TargetIcon className="mt-0.5 text-base text-accent" />
         <div>
-          <p className="text-sm font-semibold text-ink">Foundation Mode</p>
+          <p className="text-sm font-semibold text-ink">Historical Research Execution</p>
           <p className="mt-0.5 text-sm leading-relaxed text-ink-muted">
-            This page only generates and validates research parameter
-            combinations. It does not run the Research Engine and computes no
-            recovery, score or ranking — those arrive in later phases. Nothing
-            here is a trading signal or recommendation.
+            Generates and validates parameter combinations, then runs the frozen
+            Research Engine v1.0 once per READY strategy and stores the historical
+            result. Identical strategies are never rerun. This page does not rank,
+            score or compare strategies, and makes no recommendation — it only
+            executes historical research.
           </p>
         </div>
       </section>
@@ -200,8 +214,7 @@ export function StrategyFinderView() {
         <p className="mt-3 text-[11px] text-ink-faint">
           Validation rejects any combination where Recovery ≥ Entry, Stop Loss ≤
           Entry, or Recovery ≥ Stop Loss, plus duplicates and invalid numbers.
-          Only READY combinations will be sent to the Research Engine in a later
-          phase.
+          Only READY combinations are sent to the Research Engine.
         </p>
       </section>
 
@@ -216,7 +229,7 @@ export function StrategyFinderView() {
         </section>
       )}
 
-      {/* Summary */}
+      {/* Generation summary (Phase 11A) */}
       <section>
         <h2 className="stat-label mb-2">Generation Summary</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
@@ -228,75 +241,22 @@ export function StrategyFinderView() {
         </div>
       </section>
 
-      {/* Table */}
-      <section className="card overflow-hidden">
-        <header className="flex flex-wrap items-center gap-2 border-b border-panel-border px-5 py-3">
-          <TableIcon className="text-base text-accent" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">
-            Parameter Combinations
-          </h2>
-          <span className="text-xs text-ink-faint">
-            {fmtInt(filtered.length)}
-            {filtered.length > shown.length ? ` (showing first ${fmtInt(shown.length)})` : ''}
-          </span>
-          <label className="ml-auto flex items-center gap-2 text-xs">
-            <span className="stat-label">Status</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | StrategyStatus)}
-              className="rounded-md border border-panel-border bg-panel px-2 py-1 text-ink focus:border-accent focus:outline-none"
-            >
-              <option value="ALL">All</option>
-              <option value="READY">Ready</option>
-              <option value="INVALID">Invalid</option>
-              <option value="DUPLICATE">Duplicate</option>
-              <option value="PENDING">Pending</option>
-            </select>
-          </label>
-        </header>
-        <div className="max-h-[34rem] overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-panel text-xs uppercase tracking-wide text-ink-faint">
-              <tr>
-                <th className="px-3 py-2 font-medium">ID</th>
-                <th className="px-3 py-2 text-right font-medium">Entry</th>
-                <th className="px-3 py-2 text-right font-medium">Recovery</th>
-                <th className="px-3 py-2 text-right font-medium">Stop Loss</th>
-                <th className="px-3 py-2 text-center font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Validation Result</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-panel-border font-mono text-xs">
-              {shown.map((c: StrategyCombination) => (
-                <tr key={c.id} className="hover:bg-panel/50">
-                  <td className="px-3 py-1.5 text-ink-muted">{c.id}</td>
-                  <td className="px-3 py-1.5 text-right text-ink">{fmtNumber(c.entryGap, 2)}</td>
-                  <td className="px-3 py-1.5 text-right text-ink-muted">{fmtNumber(c.recoveryGap, 2)}</td>
-                  <td className="px-3 py-1.5 text-right text-ink-muted">{fmtNumber(c.stopLoss, 2)}</td>
-                  <td className="px-3 py-1.5 text-center">
-                    <span className={['rounded px-1.5 py-0.5 text-[10px] font-semibold', STATUS_STYLE[c.status]].join(' ')}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-1.5 font-sans text-ink-muted">{c.validationResult}</td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-ink-faint">
-                    No combinations for this status — adjust the ranges or the filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <footer className="border-t border-panel-border px-5 py-2 text-[11px] text-ink-faint">
-          Parameter generation only — no Research Engine calls, no recovery or
-          score computed. READY rows are the validated foundation for later
-          phases.
-        </footer>
-      </section>
+      {/* Execution controls + live progress (Phase 11B) */}
+      <StrategyExecutionPanel
+        progress={exec.progress}
+        running={exec.running}
+        paused={exec.paused}
+        canStart={exec.progress.remaining > 0 && dateFilteredSamples.length > 0}
+        onStart={exec.start}
+        onPause={exec.pause}
+        onResume={exec.resume}
+        onStop={exec.stop}
+        onReset={exec.reset}
+      />
+
+      <StrategyExecutionSummary progress={exec.progress} />
+
+      <StrategyResultsTable executions={exec.executions} />
     </div>
   );
 }
