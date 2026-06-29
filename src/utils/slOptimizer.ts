@@ -74,6 +74,17 @@ export interface SlOptimizerRow {
   score: number; // 0–100 balanced score
 }
 
+export interface SlOptimizerMeta {
+  totalTested: number;
+  minStopLoss: number;
+  maxStopLoss: number;
+  step: number;
+  /** Wall-clock time spent running the Research Engine sweep, in ms. */
+  calcTimeMs: number;
+  /** Number of Research Engine (computeScenario) calls made. */
+  engineCalls: number;
+}
+
 export interface SlOptimizerResult {
   input: SlOptimizerInput;
   rows: SlOptimizerRow[];
@@ -85,6 +96,7 @@ export interface SlOptimizerResult {
   /** Marginal recovery improvement available beyond the balanced SL. */
   marginalBeyondBalanced: number;
   truncated: boolean;
+  meta: SlOptimizerMeta;
 }
 
 const MAX_STEPS = 400;
@@ -112,10 +124,15 @@ function normalize(value: number, min: number, max: number): number {
 }
 
 /** Runs the SL sweep, calling the Research Engine once per SL value. */
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : 0;
+}
+
 export function runSlOptimizer(
   samples: GapSample[],
   input: SlOptimizerInput,
 ): SlOptimizerResult {
+  const t0 = now();
   const step = input.step > 0 ? input.step : 0.1;
   const decimals = decimalsFor(step);
 
@@ -218,7 +235,16 @@ export function runSlOptimizer(
     return { ...b, recoveryGain, riskIncrease, efficiency, score };
   });
 
-  return summarise(input, rows, truncated);
+  const meta: SlOptimizerMeta = {
+    totalTested: levels.length,
+    minStopLoss: levels.length ? levels[0]! : input.minStopLoss,
+    maxStopLoss: levels.length ? levels[levels.length - 1]! : input.maxStopLoss,
+    step,
+    engineCalls: levels.length, // exactly one Research Engine call per SL
+    calcTimeMs: now() - t0,
+  };
+
+  return summarise(input, rows, truncated, meta);
 }
 
 const BALANCED_GAIN_EPS = 0.1; // % recovery
@@ -228,6 +254,7 @@ function summarise(
   input: SlOptimizerInput,
   rows: SlOptimizerRow[],
   truncated: boolean,
+  meta: SlOptimizerMeta,
 ): SlOptimizerResult {
   const withPositions = rows.filter((r) => r.totalPositions > 0);
 
@@ -291,6 +318,7 @@ function summarise(
     highestScore,
     marginalBeyondBalanced,
     truncated,
+    meta,
   };
 }
 

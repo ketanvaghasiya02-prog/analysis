@@ -1,22 +1,38 @@
 /**
- * Stop Loss Optimizer results table (sortable).
+ * Stop Loss Optimizer results table (Phase 10A) — one row per tested SL,
+ * sortable, with the full Research Engine result set per SL.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { SlOptimizerResult, SlOptimizerRow } from '@/utils/slOptimizer';
 import { fmtDuration, fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
 import { TableIcon } from '@/components/common/icons';
 
-type SortKey =
+type NumericKey =
   | 'stopLoss'
+  | 'recoveredBeforeSl'
+  | 'recoveredAfterSl'
+  | 'slNotRecovered'
   | 'recoveryBeforeSlPct'
   | 'recoveryAfterSlPct'
   | 'recoveryIgnoringSlPct'
   | 'slHitPct'
   | 'avgRecoverySec'
+  | 'medianRecoverySec'
   | 'avgMaxGap'
+  | 'worstMaxGap'
+  | 'p95MaxGap'
+  | 'avgHoldingSec'
   | 'efficiency'
   | 'score';
+
+interface Column {
+  key: NumericKey | 'confidenceLabel';
+  label: string;
+  sortable: boolean;
+  render: (r: SlOptimizerRow) => ReactNode;
+  cellClass?: string;
+}
 
 function scoreTone(s: number): string {
   if (s >= 70) return 'text-positive';
@@ -24,21 +40,31 @@ function scoreTone(s: number): string {
   return 'text-negative';
 }
 
+const COLUMNS: Column[] = [
+  { key: 'stopLoss', label: 'Stop Loss', sortable: true, render: (r) => fmtNumber(r.stopLoss, 2), cellClass: 'text-ink' },
+  { key: 'recoveredBeforeSl', label: 'Rec. Before SL', sortable: true, render: (r) => fmtInt(r.recoveredBeforeSl) },
+  { key: 'recoveredAfterSl', label: 'Rec. After SL', sortable: true, render: (r) => fmtInt(r.recoveredAfterSl) },
+  { key: 'slNotRecovered', label: 'SL Not Recovered', sortable: true, render: (r) => fmtInt(r.slNotRecovered) },
+  { key: 'recoveryBeforeSlPct', label: 'Rec. Before SL %', sortable: true, render: (r) => fmtPercent(r.recoveryBeforeSlPct), cellClass: 'text-positive' },
+  { key: 'recoveryAfterSlPct', label: 'Rec. After SL %', sortable: true, render: (r) => fmtPercent(r.recoveryAfterSlPct), cellClass: 'text-warning' },
+  { key: 'recoveryIgnoringSlPct', label: 'Rec. Ignoring SL %', sortable: true, render: (r) => fmtPercent(r.recoveryIgnoringSlPct), cellClass: 'text-accent' },
+  { key: 'slHitPct', label: 'SL Hit %', sortable: true, render: (r) => fmtPercent(r.slHitPct), cellClass: 'text-negative' },
+  { key: 'avgRecoverySec', label: 'Avg Recovery', sortable: true, render: (r) => fmtDuration(r.avgRecoverySec) },
+  { key: 'medianRecoverySec', label: 'Median Recovery', sortable: true, render: (r) => fmtDuration(r.medianRecoverySec) },
+  { key: 'avgMaxGap', label: 'Avg Max Gap', sortable: true, render: (r) => fmtNumber(r.avgMaxGap, 3) },
+  { key: 'worstMaxGap', label: 'Worst Max Gap', sortable: true, render: (r) => fmtNumber(r.worstMaxGap, 3), cellClass: 'text-negative' },
+  { key: 'p95MaxGap', label: 'P95 Max Gap', sortable: true, render: (r) => fmtNumber(r.p95MaxGap, 3) },
+  { key: 'avgHoldingSec', label: 'Avg Holding', sortable: true, render: (r) => fmtDuration(r.avgHoldingSec) },
+  { key: 'efficiency', label: 'Efficiency', sortable: true, render: (r) => fmtNumber(r.efficiency, 2) },
+  { key: 'score', label: 'Score', sortable: true, render: (r) => <span className={scoreTone(r.score)}>{fmtNumber(r.score, 1)}</span> },
+  { key: 'confidenceLabel', label: 'Confidence', sortable: false, render: (r) => r.confidenceLabel, cellClass: 'font-sans' },
+];
+
 export function SlOptimizerTable({ result }: { result: SlOptimizerResult }) {
-  const [sortKey, setSortKey] = useState<SortKey>('stopLoss');
+  const [sortKey, setSortKey] = useState<NumericKey>('stopLoss');
   const [desc, setDesc] = useState(false);
 
-  const highlights = useMemo(
-    () =>
-      new Map<number, string>(
-        [
-          result.balanced ? [result.balanced.stopLoss, 'balanced'] as const : null,
-          result.maxSuccess ? [result.maxSuccess.stopLoss, 'max'] as const : null,
-          result.highestScore ? [result.highestScore.stopLoss, 'score'] as const : null,
-        ].filter(Boolean) as Array<readonly [number, string]>,
-      ),
-    [result],
-  );
+  const balancedSl = result.balanced?.stopLoss ?? null;
 
   const sorted = useMemo(() => {
     const out = [...result.rows];
@@ -50,29 +76,12 @@ export function SlOptimizerTable({ result }: { result: SlOptimizerResult }) {
     return out;
   }, [result.rows, sortKey, desc]);
 
-  const toggle = (k: SortKey) => {
+  const toggle = (k: NumericKey) => {
     if (k === sortKey) setDesc((d) => !d);
     else {
       setSortKey(k);
       setDesc(k !== 'stopLoss');
     }
-  };
-
-  const Th = ({ k, label }: { k: SortKey; label: string }) => (
-    <th
-      onClick={() => toggle(k)}
-      className="cursor-pointer select-none whitespace-nowrap px-3 py-2 text-right font-medium first:text-left"
-    >
-      {label}
-      {sortKey === k ? <span className="ml-1 text-ink-faint">{desc ? '▼' : '▲'}</span> : null}
-    </th>
-  );
-
-  const rowClass = (r: SlOptimizerRow): string => {
-    const h = highlights.get(r.stopLoss);
-    if (h === 'balanced') return 'bg-accent/10 ring-1 ring-inset ring-accent/40';
-    if (h === 'max') return 'bg-positive/5';
-    return 'hover:bg-panel/50';
   };
 
   return (
@@ -90,41 +99,61 @@ export function SlOptimizerTable({ result }: { result: SlOptimizerResult }) {
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 z-10 bg-panel text-xs uppercase tracking-wide text-ink-faint">
             <tr>
-              <Th k="stopLoss" label="Stop Loss" />
-              <Th k="recoveryBeforeSlPct" label="Rec. Before SL %" />
-              <Th k="recoveryAfterSlPct" label="Rec. After SL %" />
-              <Th k="recoveryIgnoringSlPct" label="Rec. Ignoring SL %" />
-              <Th k="slHitPct" label="SL Hit %" />
-              <Th k="avgRecoverySec" label="Avg Recovery" />
-              <Th k="avgMaxGap" label="Avg Max Gap" />
-              <Th k="efficiency" label="Efficiency" />
-              <Th k="score" label="Score" />
+              {COLUMNS.map((c, idx) => (
+                <th
+                  key={c.key}
+                  onClick={c.sortable ? () => toggle(c.key as NumericKey) : undefined}
+                  className={[
+                    'whitespace-nowrap px-3 py-2 font-medium',
+                    idx === 0 ? 'text-left' : 'text-right',
+                    c.sortable ? 'cursor-pointer select-none' : '',
+                  ].join(' ')}
+                >
+                  {c.label}
+                  {c.sortable && sortKey === c.key ? (
+                    <span className="ml-1 text-ink-faint">{desc ? '▼' : '▲'}</span>
+                  ) : null}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-panel-border font-mono text-xs">
-            {sorted.map((r) => (
-              <tr key={r.stopLoss} className={['transition-colors', rowClass(r)].join(' ')}>
-                <td className="px-3 py-1.5 text-ink">
-                  {fmtNumber(r.stopLoss, 2)}
-                  {highlights.get(r.stopLoss) === 'balanced' && (
-                    <span className="ml-1.5 rounded bg-accent/20 px-1 text-[10px] text-accent">balanced</span>
-                  )}
-                </td>
-                <td className="px-3 py-1.5 text-right text-positive">{fmtPercent(r.recoveryBeforeSlPct)}</td>
-                <td className="px-3 py-1.5 text-right text-warning">{fmtPercent(r.recoveryAfterSlPct)}</td>
-                <td className="px-3 py-1.5 text-right text-accent">{fmtPercent(r.recoveryIgnoringSlPct)}</td>
-                <td className="px-3 py-1.5 text-right text-negative">{fmtPercent(r.slHitPct)}</td>
-                <td className="px-3 py-1.5 text-right text-ink-muted">{fmtDuration(r.avgRecoverySec)}</td>
-                <td className="px-3 py-1.5 text-right text-ink-muted">{fmtNumber(r.avgMaxGap, 3)}</td>
-                <td className="px-3 py-1.5 text-right text-ink-muted">{fmtNumber(r.efficiency, 2)}</td>
-                <td className={['px-3 py-1.5 text-right font-semibold', scoreTone(r.score)].join(' ')}>
-                  {fmtNumber(r.score, 1)}
-                </td>
-              </tr>
-            ))}
+            {sorted.map((r) => {
+              const isBalanced = balancedSl !== null && Math.abs(r.stopLoss - balancedSl) < 1e-9;
+              return (
+                <tr
+                  key={r.stopLoss}
+                  className={
+                    isBalanced
+                      ? 'bg-accent/10 ring-1 ring-inset ring-accent/40'
+                      : 'hover:bg-panel/50'
+                  }
+                >
+                  {COLUMNS.map((c, idx) => (
+                    <td
+                      key={c.key}
+                      className={[
+                        'whitespace-nowrap px-3 py-1.5',
+                        idx === 0 ? 'text-left' : 'text-right',
+                        c.cellClass ?? 'text-ink-muted',
+                      ].join(' ')}
+                    >
+                      {idx === 0 && isBalanced ? (
+                        <>
+                          {c.render(r)}
+                          <span className="ml-1.5 rounded bg-accent/20 px-1 text-[10px] text-accent">balanced</span>
+                        </>
+                      ) : (
+                        c.render(r)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
             {result.rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-ink-faint">
+                <td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-ink-faint">
                   No SL levels — check the range and that entry events exist.
                 </td>
               </tr>
@@ -133,8 +162,9 @@ export function SlOptimizerTable({ result }: { result: SlOptimizerResult }) {
         </table>
       </div>
       <footer className="border-t border-panel-border px-5 py-2 text-[11px] text-ink-faint">
-        Positions shown are from the Research Engine. Total positions at each SL:{' '}
-        {result.rows[0] ? fmtInt(result.rows[0].totalPositions) : 0}.
+        Total positions at each SL:{' '}
+        {result.rows[0] ? fmtInt(result.rows[0].totalPositions) : 0}. Every row is one
+        Research Engine v1.0 call — no logic duplicated.
       </footer>
     </section>
   );

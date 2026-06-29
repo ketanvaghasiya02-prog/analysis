@@ -19,6 +19,7 @@ import {
 } from '@/utils/slOptimizer';
 import { downloadExport } from '@/utils/reports';
 import { SlOptimizerTable } from '@/components/sloptimizer/SlOptimizerTable';
+import { SlOptimizerValidation } from '@/components/sloptimizer/SlOptimizerValidation';
 import { SlOptimizerCharts } from '@/components/sloptimizer/SlOptimizerCharts';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { StatCard } from '@/components/overview/StatCard';
@@ -242,6 +243,8 @@ export function SlOptimizerView() {
           </p>
         </section>
       )}
+
+      <SlOptimizerValidation meta={result.meta} />
 
       <SlOptimizerTable result={result} />
       <SlOptimizerCharts result={result} />
