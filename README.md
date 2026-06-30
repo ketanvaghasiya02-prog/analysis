@@ -109,6 +109,17 @@ Standards every change must follow:
 - **[QUALITY_ASSURANCE.md](docs/QUALITY_ASSURANCE.md)** — the permanent testing
   framework: quality levels, module test matrix, golden datasets, release gate,
   bug classification and the quality certificate (run in-app at Settings → Quality Assurance).
+- **[PRODUCT_OPERATIONS.md](docs/PRODUCT_OPERATIONS.md)** — the operations manual:
+  release, deployment, versioning, branching, backup/recovery, security, logging
+  and maintenance (also the Release Guide).
+
+**Using GRT:** [Quick Start](docs/QUICK_START.md) · [User Guide](docs/USER_GUIDE.md) ·
+[Research Guide](docs/RESEARCH_GUIDE.md) · [FAQ](docs/FAQ.md) ·
+[Troubleshooting](docs/TROUBLESHOOTING.md).
+
+**Contributing & releases:** [Contributing](docs/CONTRIBUTING.md) ·
+[Changelog](CHANGELOG.md) · [V2 Backlog](docs/V2_BACKLOG.md) ·
+[Project Completion Certificate](PROJECT_COMPLETION.md).
 
 > Frozen modules (Research Engine, Research Lab, Stop Loss Optimizer, Historical
 > Strategy Finder, Research Repository, Strategy Ranking, Probability Engine)

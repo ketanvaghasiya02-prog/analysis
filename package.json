@@ -1,7 +1,8 @@
 {
   "name": "mt5-gap-monitor",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "description": "Institutional-style web app for MT5 GapMonitor CSV statistical analysis (research only).",
   "scripts": {

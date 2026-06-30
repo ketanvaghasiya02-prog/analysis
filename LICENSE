@@ -1,0 +1,23 @@
+LICENSE — Gap Research Terminal (GRT)
+
+Copyright (c) 2026 The Gap Research Terminal authors.
+
+================================================================================
+LICENSE PLACEHOLDER — TO BE CONFIGURED BEFORE PUBLIC DISTRIBUTION
+================================================================================
+
+The final license for Gap Research Terminal has not yet been selected. Licensing
+is intentionally kept configurable (see `package.json#license` and the Product
+Operations Manual, docs/PRODUCT_OPERATIONS.md §18).
+
+Until a license is chosen and this file is replaced, all rights are reserved by
+the copyright holders. No license to use, copy, modify, or distribute this
+software is granted by this placeholder.
+
+To finalize:
+  1. Choose a license (e.g. MIT, Apache-2.0, BSD-3-Clause, or a proprietary EULA).
+  2. Replace the contents of this file with the full license text.
+  3. Set the matching SPDX identifier in `package.json#license`.
+
+This is a research tool for statistical analysis of CSV exports. It is not a
+trading application and provides no financial advice.
