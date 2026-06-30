@@ -86,25 +86,6 @@ export function Dashboard() {
     );
   }
 
-  // Gap Research section — placeholder tabs (page logic added in a later phase).
-  const gapPlaceholders: Partial<Record<typeof view, string>> = {
-    'gap-explorer': 'Gap Explorer',
-    'gap-lifecycle': 'Gap Lifecycle',
-    'gap-distribution': 'Gap Distribution',
-    'gap-statistics': 'Gap Statistics',
-  };
-  const gapTitle = gapPlaceholders[view];
-  if (gapTitle) {
-    return (
-      <AppLayout>
-        <EmptyState
-          title={`${gapTitle} — coming soon`}
-          description="This Gap Research module is a placeholder. The page is reserved in the navigation; its analysis will be added in a later phase."
-        />
-      </AppLayout>
-    );
-  }
-
   let content;
   if (!hasData && isParsing) {
     content = <DashboardSkeleton />;

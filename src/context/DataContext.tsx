@@ -66,10 +66,6 @@ export type AppView =
   | 'strategy-details'
   | 'replay'
   | 'comparison'
-  | 'gap-explorer'
-  | 'gap-lifecycle'
-  | 'gap-distribution'
-  | 'gap-statistics'
   | 'settings';
 
 interface DataContextValue {
