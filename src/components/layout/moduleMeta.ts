@@ -135,6 +135,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'Generate professional, descriptive reports from existing research (PDF / CSV / JSON).',
     status: 'Experimental',
   },
+  'ea-export': {
+    title: 'EA Export Engine',
+    description: 'Export verified research as standardized config profiles (JSON / CSV / YAML / XML). No trading code.',
+    status: 'Experimental',
+  },
   'reports-daily': {
     title: 'Daily Reports',
     description: 'Per-day summaries of gap activity and outcomes.',

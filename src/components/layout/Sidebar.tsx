@@ -95,6 +95,7 @@ const ALWAYS_ENABLED = new Set<AppView>([
   'reliability-engine',
   'walk-forward',
   'assistant',
+  'ea-export',
   'reports',
   'reports-daily',
   'reports-strategy',
@@ -152,6 +153,7 @@ export function Sidebar() {
       icon: FileIcon,
       items: [
         { id: 'reports', label: 'Reporting Engine', icon: FileIcon },
+        { id: 'ea-export', label: 'EA Export Engine', icon: DatabaseIcon },
         { id: 'reports-daily', label: 'Daily Reports', icon: FileIcon },
         { id: 'reports-strategy', label: 'Strategy Reports', icon: FileIcon },
         { id: 'reports-probability', label: 'Probability Reports', icon: FileIcon },

@@ -72,6 +72,7 @@ export type AppView =
   | 'reliability-engine'
   | 'walk-forward'
   | 'assistant'
+  | 'ea-export'
   | 'reports'
   | 'reports-daily'
   | 'reports-strategy'

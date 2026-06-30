@@ -34,6 +34,7 @@ import { MarketContextView } from '@/components/market/MarketContextView';
 import { UniversalSearchView } from '@/components/search/UniversalSearchView';
 import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
 import { AiAssistantView } from '@/components/assistant/AiAssistantView';
+import { EaExportView } from '@/components/eaexport/EaExportView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
@@ -155,6 +156,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <AiAssistantView />
+      </AppLayout>
+    );
+  }
+
+  // The EA Export Engine serialises stored research; dataset-independent.
+  if (view === 'ea-export') {
+    return (
+      <AppLayout>
+        <EaExportView />
       </AppLayout>
     );
   }
