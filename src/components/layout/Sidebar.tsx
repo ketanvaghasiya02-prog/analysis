@@ -14,6 +14,7 @@ import { FileUpload } from '@/components/upload/FileUpload';
 import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
+  ChatIcon,
   ChevronIcon,
   ClockIcon,
   CompareIcon,
@@ -93,6 +94,7 @@ const ALWAYS_ENABLED = new Set<AppView>([
   'probability-engine',
   'reliability-engine',
   'walk-forward',
+  'assistant',
   'reports',
   'reports-daily',
   'reports-strategy',
@@ -141,6 +143,7 @@ export function Sidebar() {
         { id: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon },
         { id: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon },
         { id: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon },
+        { id: 'assistant', label: 'AI Research Assistant', icon: ChatIcon },
       ],
     },
     {

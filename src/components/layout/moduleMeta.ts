@@ -125,6 +125,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'Validate a stored strategy on unseen historical windows (training vs validation).',
     status: 'Experimental',
   },
+  assistant: {
+    title: 'AI Research Assistant',
+    description: 'Explains, compares and summarises existing research — interpretive only, never calculates or predicts.',
+    status: 'Experimental',
+  },
   reports: {
     title: 'Reporting Engine',
     description: 'Generate professional, descriptive reports from existing research (PDF / CSV / JSON).',

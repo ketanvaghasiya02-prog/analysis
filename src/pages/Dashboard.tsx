@@ -33,6 +33,7 @@ import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
 import { UniversalSearchView } from '@/components/search/UniversalSearchView';
 import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
+import { AiAssistantView } from '@/components/assistant/AiAssistantView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
@@ -145,6 +146,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ReportingEngineView />
+      </AppLayout>
+    );
+  }
+
+  // The AI Research Assistant explains stored research; dataset-independent.
+  if (view === 'assistant') {
+    return (
+      <AppLayout>
+        <AiAssistantView />
       </AppLayout>
     );
   }

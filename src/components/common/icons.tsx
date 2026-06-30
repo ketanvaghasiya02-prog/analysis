@@ -250,6 +250,14 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
+export function ChatIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a8.38 8.38 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />
+    </svg>
+  );
+}
+
 export function PinIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
