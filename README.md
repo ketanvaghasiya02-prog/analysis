@@ -155,6 +155,7 @@ Assistant, EA Export. See **[ROADMAP.md](docs/ROADMAP.md)**.
 | Document | Purpose |
 |---|---|
 | [PROJECT_CONSTITUTION.md](docs/PROJECT_CONSTITUTION.md) | Immutable project rules |
+| [RESEARCH_ENGINE.md](docs/RESEARCH_ENGINE.md) | Complete frozen Research Engine reference |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Complete data flow |
 | [MODULE_REGISTRY.md](docs/MODULE_REGISTRY.md) | Per-module definitions |
 | [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | Folder layout |
