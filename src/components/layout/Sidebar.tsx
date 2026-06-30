@@ -1,26 +1,33 @@
 /**
- * Left navigation sidebar: brand, collapsible section navigation, upload
- * control, loaded-file list and day-bucket overview.
+ * Left navigation sidebar — dependency-aware research workflow.
  *
- * Navigation is organised into collapsible sections (Dashboard, Research,
- * Reports, Settings). Every existing route remains accessible — modules are
- * only grouped, never removed. Expanded/collapsed state is remembered, and the
- * section containing the active page is expanded automatically.
+ * Navigation is organised into collapsible sections (Dashboard / Research /
+ * Results / Validation / Reports / System). Every page stays present; items are
+ * never deleted. Instead each item is *dependency-aware*: it reports whether it
+ * is AVAILABLE or LOCKED behind a prerequisite (CSV data, stored research, a
+ * selected strategy, etc.). Locked items show a lock + badge + tooltip and, on
+ * click, surface a small toast explaining the requirement instead of navigating
+ * to an empty page. A compact workflow progress strip summarises the state.
+ *
+ * Presentation only — no calculations, no engine logic, no page logic.
  */
 
 import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import { useData } from '@/context/DataContext';
+import { useRepository } from '@/context/RepositoryContext';
+import { useStrategyFocus } from '@/context/StrategyFocusContext';
+import { useComparison } from '@/context/ComparisonContext';
 import { FileUpload } from '@/components/upload/FileUpload';
 import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
-  ChatIcon,
   ChevronIcon,
   CompareIcon,
   DatabaseIcon,
   FileIcon,
   FlaskIcon,
   GaugeIcon,
+  LockIcon,
   RankIcon,
   RecoveryIcon,
   ReplayIcon,
@@ -37,18 +44,9 @@ import type { AppView } from '@/context/DataContext';
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface NavItem {
-  /** Unique key for the list (not necessarily a view). */
-  key: string;
   label: string;
   icon: Icon;
-  /** Navigation target + active-state match. */
   view: AppView;
-  badge?: string;
-  /** Draw a subtle group separator above this item. */
-  dividerBefore?: boolean;
-  /** A shortcut to a shared page (e.g. a sub-feature): navigates but never
-   *  shows as active, so the page's primary item keeps the highlight. */
-  shortcut?: boolean;
 }
 
 interface NavSection {
@@ -58,12 +56,14 @@ interface NavSection {
   items: NavItem[];
 }
 
-const STORAGE_KEY = 'grt.sidebar.sections.v1';
+const STORAGE_KEY = 'grt.sidebar.sections.v2';
 const DEFAULT_EXPANDED: Record<string, boolean> = {
   dashboard: true,
   research: true,
+  results: true,
+  validation: true,
   reports: true,
-  settings: true,
+  system: true,
 };
 
 function loadExpanded(): Record<string, boolean> {
@@ -84,103 +84,325 @@ function saveExpanded(state: Record<string, boolean>): void {
   }
 }
 
-// Views reachable without a loaded dataset (read stored results, render a
-// graceful empty state, or are static placeholders).
-const ALWAYS_ENABLED = new Set<AppView>([
-  'overview',
-  'search',
-  'settings',
-  'repository',
-  'ranking',
-  'strategy-details',
-  'replay',
-  'comparison',
-  'market-intelligence',
-  'probability-engine',
-  'reliability-engine',
-  'walk-forward',
-  'assistant',
-  'ea-export',
-  'qa',
-  'reports',
-  'reports-daily',
-  'reports-strategy',
-  'reports-probability',
-  'about',
-]);
+const SECTIONS: NavSection[] = [
+  {
+    id: 'dashboard',
+    title: 'Dashboard',
+    icon: ChartIcon,
+    items: [
+      { label: 'Overview', icon: TableIcon, view: 'overview' },
+      { label: 'Universal Search', icon: SearchIcon, view: 'search' },
+      { label: 'Market Intelligence', icon: GaugeIcon, view: 'market-intelligence' },
+    ],
+  },
+  {
+    id: 'research',
+    title: 'Research',
+    icon: FlaskIcon,
+    items: [
+      { label: 'Research Lab', icon: FlaskIcon, view: 'lab' },
+      { label: 'Stop Loss Optimizer', icon: SlidersIcon, view: 'sl-optimizer' },
+      { label: 'Historical Strategy Finder', icon: TargetIcon, view: 'strategy-finder' },
+      { label: 'Probability Engine', icon: GaugeIcon, view: 'probability-engine' },
+    ],
+  },
+  {
+    id: 'results',
+    title: 'Results',
+    icon: DatabaseIcon,
+    items: [
+      { label: 'Research Repository', icon: DatabaseIcon, view: 'repository' },
+      { label: 'Strategy Ranking', icon: RankIcon, view: 'ranking' },
+      { label: 'Strategy Details', icon: FileIcon, view: 'strategy-details' },
+      { label: 'Replay Engine', icon: ReplayIcon, view: 'replay' },
+      { label: 'Strategy Comparison', icon: CompareIcon, view: 'comparison' },
+    ],
+  },
+  {
+    id: 'validation',
+    title: 'Validation',
+    icon: ShieldIcon,
+    items: [
+      { label: 'Reliability Engine', icon: ShieldIcon, view: 'reliability-engine' },
+      { label: 'Walk Forward Validation', icon: TargetIcon, view: 'walk-forward' },
+      { label: 'Event Explorer', icon: ReplayIcon, view: 'explorer' },
+      { label: 'Recovery Matrix', icon: RecoveryIcon, view: 'recovery' },
+      { label: 'Stop-Loss Research', icon: ShieldIcon, view: 'stoploss' },
+    ],
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    icon: FileIcon,
+    items: [
+      { label: 'Reporting Engine', icon: FileIcon, view: 'reports' },
+      { label: 'EA Export Engine', icon: DatabaseIcon, view: 'ea-export' },
+      { label: 'Daily Reports', icon: FileIcon, view: 'reports-daily' },
+      { label: 'Strategy Reports', icon: FileIcon, view: 'reports-strategy' },
+      { label: 'Probability Reports', icon: FileIcon, view: 'reports-probability' },
+    ],
+  },
+  {
+    id: 'system',
+    title: 'System',
+    icon: SettingsIcon,
+    items: [
+      { label: 'Quality Assurance', icon: ShieldIcon, view: 'qa' },
+      { label: 'Settings', icon: SettingsIcon, view: 'settings' },
+    ],
+  },
+];
+
+// --- dependency gating --------------------------------------------------------
+
+type GateStatus =
+  | 'available'
+  | 'limited' // navigable, but degraded (search with empty repo)
+  | 'coming-soon' // navigable placeholder
+  | 'needs-data'
+  | 'needs-results'
+  | 'needs-repository'
+  | 'needs-strategy'
+  | 'needs-occurrence'
+  | 'needs-comparison'
+  | 'needs-probability'
+  | 'needs-reliability'
+  | 'needs-events';
+
+interface Gate {
+  status: GateStatus;
+  /** Right-aligned badge text. */
+  badge?: string;
+  /** Hover tooltip. */
+  tooltip?: string;
+  /** Toast shown when a locked item is clicked. */
+  toast?: string;
+}
+
+interface WorkflowState {
+  hasData: boolean;
+  recordCount: number;
+  hasFocus: boolean;
+  compareCount: number;
+  eventsCount: number;
+}
+
+const NEEDS_DATA: Gate = {
+  status: 'needs-data',
+  badge: 'Needs CSV',
+  tooltip: 'Upload a GapMonitor CSV export to enable this module.',
+  toast: 'Upload a CSV export first.',
+};
+const COMING_SOON: Gate = {
+  status: 'coming-soon',
+  badge: 'Soon',
+  tooltip: 'This module is planned for a future release.',
+};
+
+/** Navigable statuses — everything else is locked (toast on click). */
+const NAVIGABLE = new Set<GateStatus>(['available', 'limited', 'coming-soon']);
+
+function gateFor(view: AppView, s: WorkflowState): Gate {
+  switch (view) {
+    // Always available.
+    case 'overview':
+    case 'qa':
+    case 'settings':
+    case 'about':
+      return { status: 'available' };
+
+    // Always available, but degraded when the repository is empty.
+    case 'search':
+      return s.recordCount > 0
+        ? { status: 'available', badge: fmtInt(s.recordCount), tooltip: `${s.recordCount} stored result(s) indexed.` }
+        : { status: 'limited', badge: 'Limited', tooltip: 'Search limited — no research results yet. Modules are still searchable.' };
+
+    // Need CSV data.
+    case 'market-intelligence':
+    case 'lab':
+    case 'sl-optimizer':
+    case 'strategy-finder':
+    case 'probability-engine':
+    case 'explorer':
+      return s.hasData ? { status: 'available' } : NEEDS_DATA;
+
+    // Repository: needs completed research results.
+    case 'repository':
+      return s.recordCount > 0
+        ? { status: 'available', badge: fmtInt(s.recordCount), tooltip: `${s.recordCount} stored research record(s).` }
+        : {
+            status: 'needs-results',
+            badge: 'Needs Results',
+            tooltip: 'Run the Historical Strategy Finder to produce research results.',
+            toast: 'Run the Historical Strategy Finder to produce research results first.',
+          };
+
+    // Ranking: needs repository records.
+    case 'ranking':
+      return s.recordCount > 0
+        ? { status: 'available' }
+        : {
+            status: 'needs-repository',
+            badge: 'Needs Repository',
+            tooltip: 'Store research results in the Repository to rank them.',
+            toast: 'Store research results in the Repository first.',
+          };
+
+    // Details: needs a selected strategy.
+    case 'strategy-details':
+      return s.hasFocus
+        ? { status: 'available' }
+        : {
+            status: 'needs-strategy',
+            badge: 'Select Strategy',
+            tooltip: 'Select a strategy from Ranking or Repository to open its dossier.',
+            toast: 'Select a strategy from Ranking or Repository first.',
+          };
+
+    // Replay: needs a selected strategy + occurrence.
+    case 'replay':
+      return s.hasFocus
+        ? { status: 'available' }
+        : {
+            status: 'needs-occurrence',
+            badge: 'Select Occurrence',
+            tooltip: 'Open a strategy and select one occurrence to replay.',
+            toast: 'Open a strategy and select an occurrence to replay.',
+          };
+
+    // Comparison: needs 2+ selected strategies.
+    case 'comparison':
+      return s.compareCount >= 2
+        ? { status: 'available', badge: fmtInt(s.compareCount) }
+        : {
+            status: 'needs-comparison',
+            badge: 'Select 2+',
+            tooltip: `Select at least 2 strategies to compare (currently ${s.compareCount}).`,
+            toast: 'Select at least 2 strategies to compare.',
+          };
+
+    // Reliability: needs Probability Engine (CSV) or Repository results.
+    case 'reliability-engine':
+      return s.recordCount > 0 || s.hasData
+        ? { status: 'available' }
+        : {
+            status: 'needs-probability',
+            badge: 'Needs Probability',
+            tooltip: 'Run the Probability Engine or store research results first.',
+            toast: 'Run the Probability Engine or store research results first.',
+          };
+
+    // Walk Forward: needs Repository + Reliability results.
+    case 'walk-forward':
+      return s.recordCount > 0
+        ? { status: 'available' }
+        : {
+            status: 'needs-reliability',
+            badge: 'Needs Reliability',
+            tooltip: 'Stored research (Repository) and Reliability results are needed first.',
+            toast: 'Reliability results from stored research are needed first.',
+          };
+
+    // Recovery Matrix: needs detected events.
+    case 'recovery':
+      if (!s.hasData) return NEEDS_DATA;
+      return s.eventsCount > 0
+        ? { status: 'available', badge: fmtInt(s.eventsCount) }
+        : {
+            status: 'needs-events',
+            badge: 'Needs Events',
+            tooltip: 'No zone events detected in the loaded data yet.',
+            toast: 'No events detected yet in the loaded data.',
+          };
+
+    // Stop-Loss Research: needs CSV / Research Engine results.
+    case 'stoploss':
+      return s.hasData ? { status: 'available' } : NEEDS_DATA;
+
+    // Reporting Engine: after any completed research (CSV data or repository).
+    case 'reports':
+      return s.hasData || s.recordCount > 0
+        ? { status: 'available' }
+        : {
+            status: 'needs-results',
+            badge: 'Needs Data',
+            tooltip: 'Load CSV data or store research results to build a report.',
+            toast: 'Load CSV data or store research results first.',
+          };
+
+    // EA Export: after stored research (+ Reliability + Walk Forward).
+    case 'ea-export':
+      return s.recordCount > 0
+        ? { status: 'available' }
+        : {
+            status: 'needs-results',
+            badge: 'Needs Results',
+            tooltip: 'Store research results, then Reliability and Walk Forward, before exporting.',
+            toast: 'Store research results before exporting.',
+          };
+
+    // Report placeholders (planned).
+    case 'reports-daily':
+    case 'reports-strategy':
+    case 'reports-probability':
+      return COMING_SOON;
+
+    default:
+      return { status: 'available' };
+  }
+}
+
+// --- badge tones --------------------------------------------------------------
+
+function badgeClass(status: GateStatus): string {
+  if (status === 'available') return 'font-mono text-[11px] text-ink-faint';
+  if (status === 'limited' || status === 'coming-soon')
+    return 'rounded border border-panel-border bg-panel-raised px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-faint';
+  // any needs-* (locked)
+  return 'rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-warning';
+}
+
+function Stat({ label, ok, value }: { label: string; ok: boolean; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-ink-faint">{label}</span>
+      <span className={['inline-flex items-center gap-1 font-mono', ok ? 'text-positive' : 'text-ink-muted'].join(' ')}>
+        <span className={['h-1.5 w-1.5 rounded-full', ok ? 'bg-positive' : 'bg-ink-faint'].join(' ')} />
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export function Sidebar() {
-  const { dataset, validation, reset, view, setView, hasData } = useData();
+  const { dataset, validation, reset, view, setView, hasData, events } = useData();
+  const { records } = useRepository();
+  const { focus } = useStrategyFocus();
+  const { selected } = useComparison();
 
-  const sections: NavSection[] = [
-    {
-      id: 'dashboard',
-      title: 'Dashboard',
-      icon: ChartIcon,
-      items: [
-        { key: 'overview', label: 'Overview', icon: TableIcon, view: 'overview' },
-        { key: 'search', label: 'Universal Search', icon: SearchIcon, view: 'search' },
-        { key: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon, view: 'market-intelligence' },
-      ],
-    },
-    {
-      id: 'research',
-      title: 'Research',
-      icon: FlaskIcon,
-      items: [
-        // Workflow: research → repository → investigation → quantification → events → AI.
-        { key: 'lab', label: 'Research Lab', icon: FlaskIcon, view: 'lab' },
-        { key: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon, view: 'sl-optimizer' },
-        { key: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon, view: 'strategy-finder' },
+  const workflow: WorkflowState = {
+    hasData,
+    recordCount: records.length,
+    hasFocus: focus !== null,
+    compareCount: selected.length,
+    eventsCount: events.events.length,
+  };
 
-        { key: 'repository', label: 'Research Repository', icon: DatabaseIcon, view: 'repository', dividerBefore: true },
-        { key: 'ranking', label: 'Strategy Ranking', icon: RankIcon, view: 'ranking' },
-        { key: 'strategy-details', label: 'Strategy Details', icon: FileIcon, view: 'strategy-details' },
-        { key: 'replay', label: 'Replay Engine', icon: ReplayIcon, view: 'replay' },
-        { key: 'comparison', label: 'Strategy Comparison', icon: CompareIcon, view: 'comparison' },
-
-        { key: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon, view: 'probability-engine', dividerBefore: true },
-        { key: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon, view: 'reliability-engine' },
-        { key: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon, view: 'walk-forward' },
-
-        { key: 'explorer', label: 'Event Explorer', icon: ReplayIcon, view: 'explorer', dividerBefore: true },
-        { key: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon, view: 'recovery' },
-        { key: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon, view: 'stoploss' },
-
-        { key: 'assistant', label: 'AI Research Assistant', icon: ChatIcon, view: 'assistant', dividerBefore: true },
-      ],
-    },
-    {
-      id: 'reports',
-      title: 'Reports',
-      icon: FileIcon,
-      items: [
-        { key: 'reports', label: 'Reporting Engine', icon: FileIcon, view: 'reports' },
-        { key: 'ea-export', label: 'EA Export Engine', icon: DatabaseIcon, view: 'ea-export' },
-        { key: 'reports-daily', label: 'Daily Reports', icon: FileIcon, view: 'reports-daily' },
-        { key: 'reports-strategy', label: 'Strategy Reports', icon: FileIcon, view: 'reports-strategy' },
-        { key: 'reports-probability', label: 'Probability Reports', icon: FileIcon, view: 'reports-probability' },
-      ],
-    },
-    {
-      id: 'settings',
-      title: 'Settings',
-      icon: SettingsIcon,
-      items: [
-        { key: 'settings', label: 'Application Settings', icon: SettingsIcon, view: 'settings' },
-        { key: 'qa', label: 'Quality Assurance', icon: ShieldIcon, view: 'qa' },
-        { key: 'about', label: 'About GRT', icon: ChartIcon, view: 'about' },
-      ],
-    },
-  ];
-
-  const activeSectionId = sections.find((s) => s.items.some((i) => !i.shortcut && i.view === view))?.id;
+  const activeSectionId = SECTIONS.find((s) => s.items.some((i) => i.view === view))?.id;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(loadExpanded);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     saveExpanded(expanded);
   }, [expanded]);
+
+  // Auto-dismiss the locked-item toast.
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2800);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   // Auto-expand the section that contains the active page.
   useEffect(() => {
@@ -192,7 +414,7 @@ export function Sidebar() {
     setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? true) }));
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">
+    <aside className="relative flex h-full w-72 flex-col border-r border-panel-border bg-panel">
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-panel-border px-5 py-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
@@ -205,9 +427,20 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
+        {/* Workflow progress */}
+        <div className="mb-4 rounded-lg border border-panel-border bg-panel-raised/40 p-3">
+          <div className="stat-label mb-2">Workflow</div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+            <Stat label="Data" ok={hasData} value={hasData ? 'Yes' : 'No'} />
+            <Stat label="Repository" ok={workflow.recordCount > 0} value={fmtInt(workflow.recordCount)} />
+            <Stat label="Strategy" ok={workflow.hasFocus} value={workflow.hasFocus ? 'Yes' : 'No'} />
+            <Stat label="Probability" ok={hasData} value={hasData ? 'Yes' : 'No'} />
+          </div>
+        </div>
+
         {/* Nav */}
         <nav className="mb-5 space-y-3">
-          {sections.map((section) => {
+          {SECTIONS.map((section) => {
             const SectionIcon = section.icon;
             const open = expanded[section.id] ?? true;
             return (
@@ -224,33 +457,38 @@ export function Sidebar() {
                   />
                 </button>
                 {open && (
-                  <div className="mt-1 space-y-1">
+                  <div className="mt-1 space-y-0.5">
                     {section.items.map((item) => {
                       const Icon = item.icon;
-                      const active = !item.shortcut && view === item.view;
+                      const gate = gateFor(item.view, workflow);
+                      const navigable = NAVIGABLE.has(gate.status);
+                      const locked = !navigable;
+                      const active = view === item.view;
                       return (
-                        <div key={item.key}>
-                          {item.dividerBefore && <div className="mx-3 my-1.5 border-t border-panel-border/70" />}
-                          <button
-                            type="button"
-                            onClick={() => setView(item.view)}
-                            disabled={!hasData && !ALWAYS_ENABLED.has(item.view)}
-                            className={[
-                              'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                              active
-                                ? 'border border-accent/40 bg-accent/10 text-accent'
-                                : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
-                            ].join(' ')}
-                          >
-                            <Icon className="text-base" />
-                            {item.label}
-                            {item.badge !== undefined && (
-                              <span className="ml-auto font-mono text-[11px] text-ink-faint">
-                                {item.badge}
-                              </span>
-                            )}
-                          </button>
-                        </div>
+                        <button
+                          key={item.view}
+                          type="button"
+                          title={gate.tooltip ?? gate.toast ?? item.label}
+                          onClick={() => {
+                            if (locked) setToast(gate.toast ?? 'Not available yet.');
+                            else setView(item.view);
+                          }}
+                          className={[
+                            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            active
+                              ? 'border border-accent/40 bg-accent/10 text-accent'
+                              : locked
+                                ? 'border border-transparent text-ink-faint/70 hover:bg-panel-raised/40'
+                                : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink',
+                          ].join(' ')}
+                        >
+                          <Icon className={['text-base', locked ? 'opacity-60' : ''].join(' ')} />
+                          <span className="truncate">{item.label}</span>
+                          <span className="ml-auto flex items-center gap-1">
+                            {gate.badge && <span className={badgeClass(gate.status)}>{gate.badge}</span>}
+                            {locked && <LockIcon className="text-xs text-ink-faint" />}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -314,6 +552,17 @@ export function Sidebar() {
           application — no broker connection, orders or signals.
         </p>
       </div>
+
+      {/* Locked-item toast */}
+      {toast && (
+        <div
+          role="status"
+          className="absolute inset-x-3 bottom-3 z-20 flex items-start gap-2 rounded-md border border-warning/40 bg-panel-raised px-3 py-2 text-[11px] leading-relaxed text-ink shadow-lg"
+        >
+          <LockIcon className="mt-0.5 shrink-0 text-warning" />
+          <span>{toast}</span>
+        </div>
+      )}
     </aside>
   );
 }
