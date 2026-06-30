@@ -40,10 +40,18 @@ import type { AppView } from '@/context/DataContext';
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface NavItem {
-  id: AppView;
+  /** Unique key for the list (not necessarily a view). */
+  key: string;
   label: string;
   icon: Icon;
+  /** Navigation target + active-state match. */
+  view: AppView;
   badge?: string;
+  /** Draw a subtle group separator above this item. */
+  dividerBefore?: boolean;
+  /** A shortcut to a shared page (e.g. a sub-feature): navigates but never
+   *  shows as active, so the page's primary item keeps the highlight. */
+  shortcut?: boolean;
 }
 
 interface NavSection {
@@ -101,6 +109,7 @@ const ALWAYS_ENABLED = new Set<AppView>([
   'reports-daily',
   'reports-strategy',
   'reports-probability',
+  'about',
 ]);
 
 export function Sidebar() {
@@ -112,21 +121,17 @@ export function Sidebar() {
       title: 'Dashboard',
       icon: ChartIcon,
       items: [
-        { id: 'overview', label: 'Overview', icon: TableIcon },
-        { id: 'search', label: 'Universal Search', icon: SearchIcon },
-        { id: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon },
+        { key: 'overview', label: 'Overview', icon: TableIcon, view: 'overview' },
+        { key: 'search', label: 'Universal Search', icon: SearchIcon, view: 'search' },
+        { key: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon, view: 'market-intelligence' },
+        { key: 'session', label: 'Session Analysis', icon: ClockIcon, view: 'session' },
         {
-          id: 'events',
+          key: 'events',
           label: 'Events',
           icon: LayersIcon,
+          view: 'events',
           badge: hasData ? fmtInt(events.events.length) : undefined,
         },
-        { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
-        { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
-        { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
-        { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
-        { id: 'failed', label: 'Failed Events', icon: WarningIcon },
-        { id: 'session', label: 'Session Analysis', icon: ClockIcon },
       ],
     },
     {
@@ -134,18 +139,29 @@ export function Sidebar() {
       title: 'Research',
       icon: FlaskIcon,
       items: [
-        { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
-        { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
-        { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
-        { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
-        { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
-        { id: 'strategy-details', label: 'Strategy Details', icon: FileIcon },
-        { id: 'replay', label: 'Replay Engine', icon: ReplayIcon },
-        { id: 'comparison', label: 'Strategy Comparison', icon: CompareIcon },
-        { id: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon },
-        { id: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon },
-        { id: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon },
-        { id: 'assistant', label: 'AI Research Assistant', icon: ChatIcon },
+        // Workflow: research → repository → investigation → quantification → events → AI.
+        { key: 'lab', label: 'Research Lab', icon: FlaskIcon, view: 'lab' },
+        { key: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon, view: 'sl-optimizer' },
+        { key: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon, view: 'strategy-finder' },
+
+        { key: 'repository', label: 'Research Repository', icon: DatabaseIcon, view: 'repository', dividerBefore: true },
+        { key: 'ranking', label: 'Strategy Ranking', icon: RankIcon, view: 'ranking' },
+        { key: 'strategy-details', label: 'Strategy Details', icon: FileIcon, view: 'strategy-details' },
+        { key: 'replay', label: 'Replay Engine', icon: ReplayIcon, view: 'replay' },
+        { key: 'comparison', label: 'Strategy Comparison', icon: CompareIcon, view: 'comparison' },
+
+        { key: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon, view: 'probability-engine', dividerBefore: true },
+        { key: 'opportunity', label: 'Opportunity Scanner', icon: TargetIcon, view: 'probability-engine', shortcut: true },
+        { key: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon, view: 'reliability-engine' },
+        { key: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon, view: 'walk-forward' },
+
+        { key: 'explorer', label: 'Event Explorer', icon: ReplayIcon, view: 'explorer', dividerBefore: true },
+        { key: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon, view: 'recovery' },
+        { key: 'mae', label: 'MAE Analysis', icon: GaugeIcon, view: 'mae' },
+        { key: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon, view: 'stoploss' },
+        { key: 'failed', label: 'Failed Events', icon: WarningIcon, view: 'failed' },
+
+        { key: 'assistant', label: 'AI Research Assistant', icon: ChatIcon, view: 'assistant', dividerBefore: true },
       ],
     },
     {
@@ -153,11 +169,11 @@ export function Sidebar() {
       title: 'Reports',
       icon: FileIcon,
       items: [
-        { id: 'reports', label: 'Reporting Engine', icon: FileIcon },
-        { id: 'ea-export', label: 'EA Export Engine', icon: DatabaseIcon },
-        { id: 'reports-daily', label: 'Daily Reports', icon: FileIcon },
-        { id: 'reports-strategy', label: 'Strategy Reports', icon: FileIcon },
-        { id: 'reports-probability', label: 'Probability Reports', icon: FileIcon },
+        { key: 'reports', label: 'Reporting Engine', icon: FileIcon, view: 'reports' },
+        { key: 'ea-export', label: 'EA Export Engine', icon: DatabaseIcon, view: 'ea-export' },
+        { key: 'reports-daily', label: 'Daily Reports', icon: FileIcon, view: 'reports-daily' },
+        { key: 'reports-strategy', label: 'Strategy Reports', icon: FileIcon, view: 'reports-strategy' },
+        { key: 'reports-probability', label: 'Probability Reports', icon: FileIcon, view: 'reports-probability' },
       ],
     },
     {
@@ -165,13 +181,14 @@ export function Sidebar() {
       title: 'Settings',
       icon: SettingsIcon,
       items: [
-        { id: 'qa', label: 'Quality Assurance', icon: ShieldIcon },
-        { id: 'settings', label: 'Settings', icon: SettingsIcon },
+        { key: 'settings', label: 'Application Settings', icon: SettingsIcon, view: 'settings' },
+        { key: 'qa', label: 'Quality Assurance', icon: ShieldIcon, view: 'qa' },
+        { key: 'about', label: 'About GRT', icon: ChartIcon, view: 'about' },
       ],
     },
   ];
 
-  const activeSectionId = sections.find((s) => s.items.some((i) => i.id === view))?.id;
+  const activeSectionId = sections.find((s) => s.items.some((i) => !i.shortcut && i.view === view))?.id;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(loadExpanded);
 
@@ -224,28 +241,30 @@ export function Sidebar() {
                   <div className="mt-1 space-y-1">
                     {section.items.map((item) => {
                       const Icon = item.icon;
-                      const active = view === item.id;
+                      const active = !item.shortcut && view === item.view;
                       return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setView(item.id)}
-                          disabled={!hasData && !ALWAYS_ENABLED.has(item.id)}
-                          className={[
-                            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            active
-                              ? 'border border-accent/40 bg-accent/10 text-accent'
-                              : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
-                          ].join(' ')}
-                        >
-                          <Icon className="text-base" />
-                          {item.label}
-                          {item.badge !== undefined && (
-                            <span className="ml-auto font-mono text-[11px] text-ink-faint">
-                              {item.badge}
-                            </span>
-                          )}
-                        </button>
+                        <div key={item.key}>
+                          {item.dividerBefore && <div className="mx-3 my-1.5 border-t border-panel-border/70" />}
+                          <button
+                            type="button"
+                            onClick={() => setView(item.view)}
+                            disabled={!hasData && !ALWAYS_ENABLED.has(item.view)}
+                            className={[
+                              'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                              active
+                                ? 'border border-accent/40 bg-accent/10 text-accent'
+                                : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
+                            ].join(' ')}
+                          >
+                            <Icon className="text-base" />
+                            {item.label}
+                            {item.badge !== undefined && (
+                              <span className="ml-auto font-mono text-[11px] text-ink-faint">
+                                {item.badge}
+                              </span>
+                            )}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

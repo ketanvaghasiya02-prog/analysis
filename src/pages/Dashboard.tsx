@@ -36,6 +36,7 @@ import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
 import { AiAssistantView } from '@/components/assistant/AiAssistantView';
 import { EaExportView } from '@/components/eaexport/EaExportView';
 import { QaView } from '@/components/qa/QaView';
+import { AboutView } from '@/components/about/AboutView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
@@ -56,6 +57,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <SettingsView />
+      </AppLayout>
+    );
+  }
+
+  // About GRT is a static page, reachable without a dataset.
+  if (view === 'about') {
+    return (
+      <AppLayout>
+        <AboutView />
       </AppLayout>
     );
   }

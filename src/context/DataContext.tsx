@@ -78,6 +78,7 @@ export type AppView =
   | 'reports-daily'
   | 'reports-strategy'
   | 'reports-probability'
+  | 'about'
   | 'settings';
 
 interface DataContextValue {

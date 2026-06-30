@@ -166,6 +166,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     about:
       'Probability Reports will package the Probability Engine output into shareable, exportable summaries. It depends on the Probability Engine and reads stored historical evidence only.',
   },
+  about: {
+    title: 'About GRT',
+    description: 'Product identity, version and governing principles of Gap Research Terminal.',
+    status: 'Stable',
+  },
   settings: {
     title: 'Settings',
     description: 'Configure analysis defaults and preferences.',
