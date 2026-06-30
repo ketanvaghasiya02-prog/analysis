@@ -27,10 +27,8 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
   },
   'market-intelligence': {
     title: 'Market Intelligence',
-    description: 'Aggregated market context across the uploaded dataset.',
-    status: 'Coming Soon',
-    about:
-      'Market Intelligence will consolidate the dataset into a single market-context view — gap behaviour by regime, session and time of day — so you can read the broad historical picture before drilling into a specific module. It will only summarise data already loaded; it never connects to a broker or predicts the future.',
+    description: 'Statistical description of the current market context from recent history.',
+    status: 'Experimental',
   },
   events: {
     title: 'Events',
@@ -155,7 +153,6 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
 
 /** Placeholder views — rendered with the coming-soon module placeholder. */
 export const PLACEHOLDER_VIEWS: AppView[] = [
-  'market-intelligence',
   'reliability-engine',
   'walk-forward',
   'reports-daily',

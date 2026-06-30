@@ -30,6 +30,7 @@ import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
 import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
+import { MarketContextView } from '@/components/market/MarketContextView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -94,6 +95,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ProbabilityView />
+      </AppLayout>
+    );
+  }
+
+  // Market Context Engine handles its own no-data empty state.
+  if (view === 'market-intelligence') {
+    return (
+      <AppLayout>
+        <MarketContextView />
       </AppLayout>
     );
   }
