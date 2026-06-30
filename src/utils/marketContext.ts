@@ -11,15 +11,31 @@
  */
 
 import type { GapSample } from '@/types/gap';
+import type { SerializedExport } from '@/utils/reports';
 
-const DEFAULT_WINDOW_DAYS = 20;
+// Recent market behaviour is the default priority (Constitution Rule 7).
+// Gold Spot vs Gold Futures converge toward expiry, so old gap values are not
+// representative — default 15 days, advisory max 30. Long windows must be an
+// explicit user choice.
+const DEFAULT_WINDOW_DAYS = 15;
+const DEFAULT_MAX_WINDOW_DAYS = 30;
 
 export interface MarketContextInput {
+  /** Recent research window in trading days (default 15). */
   windowDays: number;
+  /** Advisory maximum window (default 30); larger is flagged, not blocked. */
+  maxWindowDays: number;
+  /** Override the "current gap"; null = use the latest sample's gap. */
+  currentGapOverride: number | null;
+  /** Session filter; empty = all sessions. */
+  sessions: string[];
 }
 
 export const DEFAULT_MARKET_CONTEXT_INPUT: MarketContextInput = {
   windowDays: DEFAULT_WINDOW_DAYS,
+  maxWindowDays: DEFAULT_MAX_WINDOW_DAYS,
+  currentGapOverride: null,
+  sessions: [],
 };
 
 export interface HistogramBin {
@@ -39,9 +55,35 @@ export interface SessionContext {
 
 export type RegimeTone = 'positive' | 'warning' | 'negative' | 'accent';
 
+export interface GapDistribution {
+  min: number;
+  p25: number;
+  median: number; // P50
+  p75: number;
+  p90: number;
+  p95: number;
+  max: number;
+}
+
+export interface VolPoint {
+  day: string;
+  volatility: number;
+}
+
+export type MarketRegimeKind = 'Normal' | 'Expansion' | 'Compression' | 'Transition';
+
+export interface MarketRegime {
+  kind: MarketRegimeKind;
+  tone: RegimeTone;
+  reason: string;
+}
+
 export interface MarketContext {
   hasData: boolean;
   windowDays: number;
+  maxWindowDays: number;
+  windowCapped: boolean;
+  currentGapIsOverride: boolean;
   windowDayCount: number;
   windowStartDay: string | null;
   windowEndDay: string | null;
@@ -61,14 +103,20 @@ export interface MarketContext {
   recentAvgGap: number | null;
   recentMedianGap: number | null;
   recentVolatility: number | null; // std dev of recent gaps
+  averageDailyVolatility: number | null; // mean per-day volatility in the window
+  relativeVolatility: number | null; // recentVolatility / averageDailyVolatility
+  volPercentile: number; // recent volatility percentile vs daily-vol distribution
   recentMovement: number | null; // mean |Δgap| between consecutive recent samples
 
   trend: 'expanding' | 'compressing' | 'stable';
   expansionPct: number; // share of upward moves recently
   compressionPct: number; // share of downward moves recently
 
+  distribution: GapDistribution | null;
   histogram: HistogramBin[];
+  volatilityDistribution: VolPoint[];
 
+  marketRegime: MarketRegime;
   regime: { label: string; tone: RegimeTone; gapState: string; volState: string };
 
   contract: {
@@ -115,6 +163,31 @@ function percentileBelow(values: number[], target: number): number {
   return (below / values.length) * 100;
 }
 
+/** Value at percentile p (0–100) using linear interpolation. */
+function percentileValue(values: number[], p: number): number | null {
+  if (values.length === 0) return null;
+  const s = [...values].sort((a, b) => a - b);
+  if (s.length === 1) return s[0]!;
+  const idx = (p / 100) * (s.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return s[lo]!;
+  return s[lo]! + (s[hi]! - s[lo]!) * (idx - lo);
+}
+
+function distributionOf(gaps: number[]): GapDistribution | null {
+  if (gaps.length === 0) return null;
+  return {
+    min: Math.min(...gaps),
+    p25: percentileValue(gaps, 25) ?? 0,
+    median: percentileValue(gaps, 50) ?? 0,
+    p75: percentileValue(gaps, 75) ?? 0,
+    p90: percentileValue(gaps, 90) ?? 0,
+    p95: percentileValue(gaps, 95) ?? 0,
+    max: Math.max(...gaps),
+  };
+}
+
 function gapsOf(samples: GapSample[]): number[] {
   const out: number[] = [];
   for (const s of samples) if (s.gap !== null) out.push(s.gap);
@@ -149,9 +222,13 @@ function buildHistogram(gaps: number[], current: number, binCount = 16): Histogr
 export function buildMarketContext(samples: GapSample[], input: MarketContextInput): MarketContext {
   const windowDays = input.windowDays > 0 ? Math.round(input.windowDays) : DEFAULT_WINDOW_DAYS;
 
+  const maxWindowDays = input.maxWindowDays > 0 ? Math.round(input.maxWindowDays) : DEFAULT_MAX_WINDOW_DAYS;
   const empty: MarketContext = {
     hasData: false,
     windowDays,
+    maxWindowDays,
+    windowCapped: windowDays > maxWindowDays,
+    currentGapIsOverride: input.currentGapOverride !== null,
     windowDayCount: 0,
     windowStartDay: null,
     windowEndDay: null,
@@ -162,11 +239,17 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
     recentAvgGap: null,
     recentMedianGap: null,
     recentVolatility: null,
+    averageDailyVolatility: null,
+    relativeVolatility: null,
+    volPercentile: 50,
     recentMovement: null,
     trend: 'stable',
     expansionPct: 0,
     compressionPct: 0,
+    distribution: null,
     histogram: [],
+    volatilityDistribution: [],
+    marketRegime: { kind: 'Normal', tone: 'accent', reason: 'No data' },
     regime: { label: 'No data', tone: 'accent', gapState: '—', volState: '—' },
     contract: null,
     sessions: [],
@@ -187,14 +270,18 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
   }
   if (!current) return empty;
 
-  // Recent window = the last `windowDays` distinct trading days.
+  // Recent window = the last `windowDays` distinct trading days. The session
+  // filter (if any) scopes every recent-window metric.
+  const sessionSet = input.sessions.length ? new Set(input.sessions) : null;
+  const inSession = (s: GapSample) => !sessionSet || sessionSet.has(s.currentSession);
   const dayKeys = Array.from(new Set(samples.map((s) => s.dayKey))).filter((d) => d && d !== 'unknown').sort();
   const windowDayKeys = new Set(dayKeys.slice(Math.max(0, dayKeys.length - windowDays)));
-  const windowSamples = samples.filter((s) => windowDayKeys.has(s.dayKey));
+  const windowSamples = samples.filter((s) => windowDayKeys.has(s.dayKey) && inSession(s));
   const windowGaps = gapsOf(windowSamples);
-  const allGaps = gapsOf(samples);
+  const allGaps = gapsOf(samples.filter(inSession));
 
-  const currentGap = current.gap!;
+  // Current gap: an explicit override, else the latest sample's gap.
+  const currentGap = input.currentGapOverride ?? current.gap!;
   const gapPercentileRecent = percentileBelow(windowGaps, currentGap);
   const gapPercentileAll = percentileBelow(allGaps, currentGap);
   const recentAvgGap = mean(windowGaps);
@@ -225,13 +312,28 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
     else if (tailAvg < recentAvgGap - band) trend = 'compressing';
   }
 
-  // Regime — deterministic from recent gap percentile + volatility percentile.
+  // Recent gap distribution (within the window only).
+  const distribution = distributionOf(windowGaps);
+
+  // Per-day volatility within the window → average + relative + distribution.
+  const windowDayList = [...windowDayKeys].sort();
+  const volatilityDistribution: VolPoint[] = [];
   const dailyVol: number[] = [];
-  for (const day of dayKeys) {
-    const v = stdDev(gapsOf(samples.filter((s) => s.dayKey === day)));
-    if (v !== null) dailyVol.push(v);
+  for (const day of windowDayList) {
+    const v = stdDev(gapsOf(windowSamples.filter((s) => s.dayKey === day)));
+    if (v !== null) {
+      dailyVol.push(v);
+      volatilityDistribution.push({ day, volatility: v });
+    }
   }
+  const averageDailyVolatility = mean(dailyVol);
+  const relativeVolatility =
+    recentVolatility !== null && averageDailyVolatility !== null && averageDailyVolatility > 1e-9
+      ? recentVolatility / averageDailyVolatility
+      : null;
   const volPercentile = recentVolatility !== null ? percentileBelow(dailyVol, recentVolatility) : 50;
+
+  // Legacy gap/volatility-state regime (kept for the existing indicator).
   const gapState = gapPercentileRecent >= 80 ? 'Wide gap' : gapPercentileRecent <= 20 ? 'Tight gap' : 'Normal gap';
   const volState = volPercentile >= 70 ? 'High volatility' : volPercentile <= 30 ? 'Low volatility' : 'Normal volatility';
   let regimeTone: RegimeTone = 'accent';
@@ -239,6 +341,19 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
   else if (gapPercentileRecent <= 20 && volPercentile <= 30) regimeTone = 'positive';
   else regimeTone = 'warning';
   const regime = { label: `${gapState} · ${volState}`, tone: regimeTone, gapState, volState };
+
+  // Deterministic market regime: Normal / Expansion / Compression / Transition.
+  const highVol = volPercentile >= 70;
+  let marketRegime: MarketRegime;
+  if (highVol && trend === 'stable') {
+    marketRegime = { kind: 'Transition', tone: 'warning', reason: 'High recent volatility with no clear directional trend.' };
+  } else if (trend === 'expanding' || expansionPct >= 60) {
+    marketRegime = { kind: 'Expansion', tone: 'negative', reason: 'The gap has been widening relative to its recent average.' };
+  } else if (trend === 'compressing' || compressionPct >= 60) {
+    marketRegime = { kind: 'Compression', tone: 'positive', reason: 'The gap has been compressing relative to its recent average.' };
+  } else {
+    marketRegime = { kind: 'Normal', tone: 'accent', reason: 'Recent behaviour is broadly stable around its average.' };
+  }
 
   // Contract age + roll detection.
   const symbol = current.futureSymbol;
@@ -279,6 +394,9 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
   return {
     hasData: true,
     windowDays,
+    maxWindowDays,
+    windowCapped: windowDays > maxWindowDays,
+    currentGapIsOverride: input.currentGapOverride !== null,
     windowDayCount: windowDayKeys.size,
     windowStartDay: dayKeys[Math.max(0, dayKeys.length - windowDays)] ?? null,
     windowEndDay: dayKeys[dayKeys.length - 1] ?? null,
@@ -296,11 +414,17 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
     recentAvgGap,
     recentMedianGap,
     recentVolatility,
+    averageDailyVolatility,
+    relativeVolatility,
+    volPercentile,
     recentMovement,
     trend,
     expansionPct,
     compressionPct,
+    distribution,
     histogram,
+    volatilityDistribution,
+    marketRegime,
     regime,
     contract,
     sessions,
@@ -311,8 +435,9 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
       gapPercentileRecent,
       recentAvgGap,
       recentVolatility,
+      relativeVolatility,
       trend,
-      regime,
+      marketRegime,
       sessionContext,
       contract,
     }),
@@ -329,31 +454,33 @@ function buildObservations(x: {
   gapPercentileRecent: number;
   recentAvgGap: number | null;
   recentVolatility: number | null;
+  relativeVolatility: number | null;
   trend: MarketContext['trend'];
-  regime: MarketContext['regime'];
+  marketRegime: MarketRegime;
   sessionContext: MarketContext['sessionContext'];
   contract: MarketContext['contract'];
 }): string[] {
   const out: string[] = [];
 
+  const pct = Math.round(x.gapPercentileRecent);
+  const rare = pct >= 95 || pct <= 5;
   out.push(
-    `The current gap (${fmt(x.currentGap)}) is larger than ${Math.round(x.gapPercentileRecent)}% of observations in the last ${x.windowDayCount} trading day${x.windowDayCount === 1 ? '' : 's'}.`,
+    `The current gap (${fmt(x.currentGap)}) is larger than ${pct}% of observations in the last ${x.windowDayCount} trading day${x.windowDayCount === 1 ? '' : 's'}${rare ? ' — historically rare within the selected research window' : ''}.`,
   );
   if (x.recentAvgGap !== null) {
     const rel = x.currentGap > x.recentAvgGap ? 'above' : x.currentGap < x.recentAvgGap ? 'below' : 'in line with';
     out.push(`The recent average gap is ${fmt(x.recentAvgGap)}; the current gap is ${rel} the recent average.`);
   }
-  if (x.trend !== 'stable') {
-    out.push(`The gap has recently been ${x.trend} relative to its recent average.`);
-  } else {
-    out.push('The gap has recently been broadly stable relative to its recent average.');
+  if (x.relativeVolatility !== null) {
+    const lvl = x.relativeVolatility >= 1.15 ? 'above' : x.relativeVolatility <= 0.85 ? 'below' : 'around';
+    out.push(`Current recent volatility is ${lvl} the recent daily average (${fmt(x.relativeVolatility, 2)}× the average daily volatility).`);
   }
   if (x.sessionContext) {
     out.push(
       `The current session (${x.sessionContext.current}) historically shows ${x.sessionContext.aboveAverage ? 'above-average' : 'around- or below-average'} volatility in this window.`,
     );
   }
-  out.push(`Current regime: ${x.regime.label}.`);
+  out.push(`Current market regime: ${x.marketRegime.kind} — ${x.marketRegime.reason}`);
   if (x.contract) {
     out.push(
       `The current contract (${x.contract.symbol}) has been active for ${x.contract.ageDays} trading day${x.contract.ageDays === 1 ? '' : 's'} in the uploaded data${x.contract.rollDetectedInWindow ? `; a contract roll was detected on ${x.contract.rollDay}` : ''}.`,
@@ -361,4 +488,67 @@ function buildObservations(x: {
   }
   out.push('This is statistical context from uploaded history only — not a prediction or recommendation.');
   return out;
+}
+
+// --- export -------------------------------------------------------------------
+
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+const r3 = (n: number | null) => (n === null ? '' : Math.round(n * 1000) / 1000);
+
+export function marketContextCsv(ctx: MarketContext): SerializedExport {
+  const lines: string[] = [];
+  lines.push('Section,Metric,Value');
+  const row = (sec: string, m: string, v: string | number) => lines.push([sec, m, v].map(csvCell).join(','));
+  if (ctx.current) {
+    row('Current', 'Gap', r3(ctx.current.gap));
+    row('Current', 'Session', ctx.current.session);
+    row('Current', 'Trading Day', ctx.current.day);
+    row('Current', 'Gap Percentile (recent)', Math.round(ctx.gapPercentileRecent));
+    row('Current', 'Market Regime', ctx.marketRegime.kind);
+  }
+  row('Window', 'Research Window (days)', ctx.windowDays);
+  row('Window', 'Days Covered', ctx.windowDayCount);
+  row('Window', 'Sample Count', ctx.windowSampleCount);
+  if (ctx.distribution) {
+    const d = ctx.distribution;
+    row('Distribution', 'Min', r3(d.min));
+    row('Distribution', 'P25', r3(d.p25));
+    row('Distribution', 'Median (P50)', r3(d.median));
+    row('Distribution', 'P75', r3(d.p75));
+    row('Distribution', 'P90', r3(d.p90));
+    row('Distribution', 'P95', r3(d.p95));
+    row('Distribution', 'Max', r3(d.max));
+  }
+  row('Volatility', 'Recent Volatility', r3(ctx.recentVolatility));
+  row('Volatility', 'Average Daily Volatility', r3(ctx.averageDailyVolatility));
+  row('Volatility', 'Relative Volatility', r3(ctx.relativeVolatility));
+  row('Volatility', 'Expansion Frequency %', Math.round(ctx.expansionPct));
+  row('Volatility', 'Compression Frequency %', Math.round(ctx.compressionPct));
+  for (const s of ctx.sessions) {
+    row('Session', `${s.session} avg gap`, r3(s.avgGap));
+    row('Session', `${s.session} volatility`, r3(s.volatility));
+    row('Session', `${s.session} samples`, s.samples);
+  }
+  return { filename: 'MarketContext.csv', content: lines.join('\n'), mime: 'text/csv' };
+}
+
+export function marketContextJson(ctx: MarketContext, generatedAt: string): SerializedExport {
+  const payload = {
+    note: 'Market context describes where today stands relative to recent history. Descriptive only — never a prediction, recommendation or signal.',
+    generatedAt,
+    window: { days: ctx.windowDays, maxDays: ctx.maxWindowDays, capped: ctx.windowCapped, daysCovered: ctx.windowDayCount, samples: ctx.windowSampleCount, start: ctx.windowStartDay, end: ctx.windowEndDay },
+    current: ctx.current,
+    gapPercentileRecent: ctx.gapPercentileRecent,
+    gapPercentileAll: ctx.gapPercentileAll,
+    distribution: ctx.distribution,
+    volatility: { recent: ctx.recentVolatility, averageDaily: ctx.averageDailyVolatility, relative: ctx.relativeVolatility, percentile: ctx.volPercentile, expansionPct: ctx.expansionPct, compressionPct: ctx.compressionPct },
+    marketRegime: ctx.marketRegime,
+    sessions: ctx.sessions,
+    contract: ctx.contract,
+    observations: ctx.observations,
+  };
+  return { filename: 'MarketContext.json', content: JSON.stringify(payload, null, 2), mime: 'application/json' };
 }
