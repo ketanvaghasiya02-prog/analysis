@@ -158,6 +158,7 @@ Assistant, EA Export. See **[ROADMAP.md](docs/ROADMAP.md)**.
 | [RESEARCH_ENGINE.md](docs/RESEARCH_ENGINE.md) | Complete frozen Research Engine reference |
 | [RESEARCH_LAB.md](docs/RESEARCH_LAB.md) | Complete frozen Research Lab reference |
 | [STOP_LOSS_OPTIMIZER.md](docs/STOP_LOSS_OPTIMIZER.md) | Complete frozen Stop Loss Optimizer reference |
+| [HISTORICAL_STRATEGY_FINDER.md](docs/HISTORICAL_STRATEGY_FINDER.md) | Frozen Finder ecosystem (generation → execution → repository → ranking → details → replay → comparison) |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Complete data flow |
 | [MODULE_REGISTRY.md](docs/MODULE_REGISTRY.md) | Per-module definitions |
 | [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | Folder layout |
