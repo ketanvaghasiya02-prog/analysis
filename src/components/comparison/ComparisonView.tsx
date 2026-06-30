@@ -13,7 +13,6 @@ import {
   comparisonJson,
   printComparisonPdf,
   MAX_COMPARE,
-  MIN_COMPARE,
   type CompStrategy,
   type MetricFormat,
   type MetricRow,
@@ -27,6 +26,56 @@ import { AlertIcon, DownloadIcon, LayersIcon, TableIcon } from '@/components/com
 
 const CONFIDENCE_ORDER: ConfidenceLevel[] = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
 const DIFF_METRIC_KEYS = ['historicalTrades', 'recoveryBeforeSlPct', 'recoveryIgnoringSlPct', 'slHitPct', 'avgRecoverySec', 'worstMaxGap', 'overallScore'];
+
+const BASELINE_KEY = '__repository_baseline__';
+
+/**
+ * A synthetic "Repository Baseline" record = the average of all stored
+ * strategies. Used so a single strategy always has something to compare
+ * against. Page-level data prep only — a transparent mean; the frozen
+ * comparison engine and the stored repository records are untouched.
+ */
+function repositoryBaseline(records: RepositoryRecord[]): RepositoryRecord {
+  const n = Math.max(1, records.length);
+  const mean = (f: (r: RepositoryRecord) => number) => records.reduce((a, r) => a + f(r), 0) / n;
+  const meanNul = (f: (r: RepositoryRecord) => number | null) => {
+    const vs = records.map(f).filter((v): v is number => v !== null && Number.isFinite(v));
+    return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+  };
+  const ord = Math.round(mean((r) => CONFIDENCE_ORDER.indexOf(r.confidenceLevel)));
+  const confidenceLevel = CONFIDENCE_ORDER[Math.min(CONFIDENCE_ORDER.length - 1, Math.max(0, ord))]!;
+  const froms = records.map((r) => r.dateFrom).filter(Boolean).sort();
+  const tos = records.map((r) => r.dateTo).filter(Boolean).sort();
+  return {
+    key: BASELINE_KEY,
+    id: 'Repository Baseline',
+    entryGap: mean((r) => r.entryGap),
+    recoveryGap: mean((r) => r.recoveryGap),
+    stopLoss: mean((r) => r.stopLoss),
+    recoveryBeforeSlPct: mean((r) => r.recoveryBeforeSlPct),
+    recoveryAfterSlPct: mean((r) => r.recoveryAfterSlPct),
+    recoveryIgnoringSlPct: mean((r) => r.recoveryIgnoringSlPct),
+    slHitPct: mean((r) => r.slHitPct),
+    totalPositions: Math.round(mean((r) => r.totalPositions)),
+    historicalTrades: Math.round(mean((r) => r.historicalTrades)),
+    avgRecoverySec: meanNul((r) => r.avgRecoverySec),
+    medianRecoverySec: meanNul((r) => r.medianRecoverySec),
+    avgMaxGap: meanNul((r) => r.avgMaxGap),
+    worstMaxGap: meanNul((r) => r.worstMaxGap),
+    p95MaxGap: meanNul((r) => r.p95MaxGap),
+    p99MaxGap: meanNul((r) => r.p99MaxGap),
+    avgHoldingSec: meanNul((r) => r.avgHoldingSec),
+    confidenceLevel,
+    confidenceLabel: CONFIDENCE_LABELS[confidenceLevel],
+    executionMs: 0,
+    createdAt: 0,
+    sameDayOnly: records[0]?.sameDayOnly ?? true,
+    dateFrom: froms[0] ?? '',
+    dateTo: tos[tos.length - 1] ?? '',
+    sessions: [...new Set(records.flatMap((r) => r.sessions))].sort(),
+    occurrences: [],
+  };
+}
 
 function fmtCell(v: number | null, format: MetricFormat): string {
   if (v === null || !Number.isFinite(v)) return '—';
@@ -58,10 +107,27 @@ export function ComparisonView() {
     [selected, records],
   );
 
-  const comparison = useMemo(
-    () => (selectedRecords.length >= MIN_COMPARE ? buildComparison(selectedRecords) : null),
-    [selectedRecords],
+  // Zero-friction default: with no manual filter, compare ALL stored strategies
+  // (capped at MAX_COMPARE). No selection is ever required to open the page.
+  const baseSet = useMemo(
+    () => (selectedRecords.length > 0 ? selectedRecords : records.slice(0, MAX_COMPARE)),
+    [selectedRecords, records],
   );
+
+  // A single strategy is compared against the repository baseline (the average
+  // of every stored strategy), so one strategy is always meaningful.
+  const usingBaseline = baseSet.length === 1;
+  const comparisonRecords = useMemo(
+    () => (usingBaseline ? [repositoryBaseline(records), baseSet[0]!] : baseSet),
+    [usingBaseline, records, baseSet],
+  );
+
+  const comparison = useMemo(
+    () => (comparisonRecords.length >= 1 ? buildComparison(comparisonRecords) : null),
+    [comparisonRecords],
+  );
+
+  const truncated = selectedRecords.length === 0 && records.length > MAX_COMPARE;
 
   const filteredRepo = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -96,10 +162,12 @@ export function ComparisonView() {
       {/* Selection */}
       <section className="card p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="stat-label">Select Strategies ({MIN_COMPARE}–{MAX_COMPARE})</span>
-          <span className="text-xs text-ink-faint">{selected.length} selected</span>
+          <span className="stat-label">Filter Strategies (optional)</span>
+          <span className="text-xs text-ink-faint">
+            {selected.length > 0 ? `${selected.length} selected` : `showing all · up to ${MAX_COMPARE}`}
+          </span>
           {selected.length > 0 && (
-            <button type="button" onClick={clear} className="btn px-2 py-0.5 text-xs">Clear</button>
+            <button type="button" onClick={clear} className="btn px-2 py-0.5 text-xs">Show all</button>
           )}
           <input
             type="text"
@@ -160,14 +228,24 @@ export function ComparisonView() {
         {full && <p className="mt-2 text-[11px] text-warning">Maximum of {MAX_COMPARE} strategies selected.</p>}
       </section>
 
-      {selectedRecords.length < MIN_COMPARE ? (
-        <section className="card flex flex-col items-center gap-2 p-10 text-center">
-          <TableIcon className="text-2xl text-ink-faint" />
-          <h2 className="text-base font-semibold text-ink">Select at least {MIN_COMPARE} strategies</h2>
-          <p className="max-w-md text-sm text-ink-muted">Tick {MIN_COMPARE}–{MAX_COMPARE} strategies above to compare them side-by-side.</p>
-        </section>
-      ) : comparison ? (
+      {comparison ? (
         <>
+          {usingBaseline && (
+            <section className="card flex items-start gap-3 border-accent/30 bg-accent/5 p-3">
+              <AlertIcon className="mt-0.5 text-base text-accent" />
+              <p className="text-[13px] leading-relaxed text-ink-muted">
+                Comparing one strategy against the <span className="font-semibold text-ink">Repository Baseline</span> — the average
+                of {fmtInt(records.length)} stored {records.length === 1 ? 'strategy' : 'strategies'}. Tick 2+ strategies above to
+                compare them directly instead.
+              </p>
+            </section>
+          )}
+          {truncated && (
+            <p className="text-[11px] text-ink-faint">
+              Showing the first {MAX_COMPARE} of {fmtInt(records.length)} stored strategies. Use the filter above to choose which to compare.
+            </p>
+          )}
+
           {/* Legend + export */}
           <section className="flex flex-wrap items-center gap-3">
             <div className="flex flex-wrap gap-2">
@@ -430,9 +508,11 @@ function Banner() {
     <section className="card flex items-start gap-3 border-accent/30 bg-accent/5 p-4">
       <AlertIcon className="mt-0.5 text-base text-accent" />
       <p className="text-sm leading-relaxed text-ink-muted">
-        Compare 2–5 stored strategies side-by-side using their historical research
-        results. Everything is read from the Research Repository — no strategy is
-        rerun, and nothing here is a recommendation or prediction.
+        Compare stored strategies side-by-side using their historical research
+        results. All strategies are shown by default (a single strategy is compared
+        against the repository baseline); use the filter to narrow the set. Everything
+        is read from the Research Repository — no strategy is rerun, and nothing here
+        is a recommendation or prediction.
       </p>
     </section>
   );

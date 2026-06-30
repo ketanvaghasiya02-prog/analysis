@@ -16,7 +16,6 @@ import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import { useData } from '@/context/DataContext';
 import { useRepository } from '@/context/RepositoryContext';
 import { useStrategyFocus } from '@/context/StrategyFocusContext';
-import { useComparison } from '@/context/ComparisonContext';
 import { FileUpload } from '@/components/upload/FileUpload';
 import { fmtInt } from '@/utils/format';
 import {
@@ -183,7 +182,6 @@ interface WorkflowState {
   hasData: boolean;
   recordCount: number;
   hasFocus: boolean;
-  compareCount: number;
   eventsCount: number;
 }
 
@@ -270,15 +268,17 @@ function gateFor(view: AppView, s: WorkflowState): Gate {
             toast: 'Open a strategy and select an occurrence to replay.',
           };
 
-    // Comparison: needs 2+ selected strategies.
+    // Comparison: unlocked as soon as the Repository / Ranking holds at least
+    // one strategy. Selecting strategies is optional (the page defaults to all,
+    // or a single strategy vs the repository baseline).
     case 'comparison':
-      return s.compareCount >= 2
-        ? { status: 'available', badge: fmtInt(s.compareCount) }
+      return s.recordCount >= 1
+        ? { status: 'available', badge: 'Ready', tooltip: 'Compare stored strategies. Selecting strategies is optional.' }
         : {
-            status: 'needs-comparison',
-            badge: 'Select 2+',
-            tooltip: `Select at least 2 strategies to compare (currently ${s.compareCount}).`,
-            toast: 'Select at least 2 strategies to compare.',
+            status: 'needs-repository',
+            badge: 'Needs Repository',
+            tooltip: 'Store research results in the Repository to compare strategies.',
+            toast: 'Store research results in the Repository first.',
           };
 
     // Reliability: needs Probability Engine (CSV) or Repository results.
@@ -354,8 +354,12 @@ function gateFor(view: AppView, s: WorkflowState): Gate {
 
 // --- badge tones --------------------------------------------------------------
 
-function badgeClass(status: GateStatus): string {
-  if (status === 'available') return 'font-mono text-[11px] text-ink-faint';
+function badgeClass(status: GateStatus, badge?: string): string {
+  if (status === 'available') {
+    if (badge === 'Ready' || badge === 'Validated')
+      return 'rounded border border-positive/30 bg-positive/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-positive';
+    return 'font-mono text-[11px] text-ink-faint';
+  }
   if (status === 'limited' || status === 'coming-soon')
     return 'rounded border border-panel-border bg-panel-raised px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-faint';
   // any needs-* (locked)
@@ -378,13 +382,11 @@ export function Sidebar() {
   const { dataset, validation, reset, view, setView, hasData, events } = useData();
   const { records } = useRepository();
   const { focus } = useStrategyFocus();
-  const { selected } = useComparison();
 
   const workflow: WorkflowState = {
     hasData,
     recordCount: records.length,
     hasFocus: focus !== null,
-    compareCount: selected.length,
     eventsCount: events.events.length,
   };
 
@@ -485,7 +487,7 @@ export function Sidebar() {
                           <Icon className={['text-base', locked ? 'opacity-60' : ''].join(' ')} />
                           <span className="truncate">{item.label}</span>
                           <span className="ml-auto flex items-center gap-1">
-                            {gate.badge && <span className={badgeClass(gate.status)}>{gate.badge}</span>}
+                            {gate.badge && <span className={badgeClass(gate.status, gate.badge)}>{gate.badge}</span>}
                             {locked && <LockIcon className="text-xs text-ink-faint" />}
                           </span>
                         </button>
