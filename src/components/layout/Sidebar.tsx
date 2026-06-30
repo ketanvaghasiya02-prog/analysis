@@ -16,13 +16,11 @@ import {
   ChartIcon,
   ChatIcon,
   ChevronIcon,
-  ClockIcon,
   CompareIcon,
   DatabaseIcon,
   FileIcon,
   FlaskIcon,
   GaugeIcon,
-  LayersIcon,
   RankIcon,
   RecoveryIcon,
   ReplayIcon,
@@ -33,7 +31,6 @@ import {
   TableIcon,
   TargetIcon,
   TrashIcon,
-  WarningIcon,
 } from '@/components/common/icons';
 import type { AppView } from '@/context/DataContext';
 
@@ -113,7 +110,7 @@ const ALWAYS_ENABLED = new Set<AppView>([
 ]);
 
 export function Sidebar() {
-  const { dataset, validation, reset, view, setView, hasData, events } = useData();
+  const { dataset, validation, reset, view, setView, hasData } = useData();
 
   const sections: NavSection[] = [
     {
@@ -124,14 +121,6 @@ export function Sidebar() {
         { key: 'overview', label: 'Overview', icon: TableIcon, view: 'overview' },
         { key: 'search', label: 'Universal Search', icon: SearchIcon, view: 'search' },
         { key: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon, view: 'market-intelligence' },
-        { key: 'session', label: 'Session Analysis', icon: ClockIcon, view: 'session' },
-        {
-          key: 'events',
-          label: 'Events',
-          icon: LayersIcon,
-          view: 'events',
-          badge: hasData ? fmtInt(events.events.length) : undefined,
-        },
       ],
     },
     {
@@ -151,15 +140,12 @@ export function Sidebar() {
         { key: 'comparison', label: 'Strategy Comparison', icon: CompareIcon, view: 'comparison' },
 
         { key: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon, view: 'probability-engine', dividerBefore: true },
-        { key: 'opportunity', label: 'Opportunity Scanner', icon: TargetIcon, view: 'probability-engine', shortcut: true },
         { key: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon, view: 'reliability-engine' },
         { key: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon, view: 'walk-forward' },
 
         { key: 'explorer', label: 'Event Explorer', icon: ReplayIcon, view: 'explorer', dividerBefore: true },
         { key: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon, view: 'recovery' },
-        { key: 'mae', label: 'MAE Analysis', icon: GaugeIcon, view: 'mae' },
         { key: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon, view: 'stoploss' },
-        { key: 'failed', label: 'Failed Events', icon: WarningIcon, view: 'failed' },
 
         { key: 'assistant', label: 'AI Research Assistant', icon: ChatIcon, view: 'assistant', dividerBefore: true },
       ],
