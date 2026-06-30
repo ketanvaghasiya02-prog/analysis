@@ -112,10 +112,8 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
   },
   'reliability-engine': {
     title: 'Reliability Engine',
-    description: 'Stability and consistency scoring of historical results.',
-    status: 'Coming Soon',
-    about:
-      'The Reliability Engine will measure how consistent a strategy has been across time, sessions and sub-samples of the uploaded data — surfacing variance, drawdown clusters and sample-size confidence — so you can see how stable a historical edge looks. It reads stored results only and makes no forward-looking claims.',
+    description: 'How much to trust a stored historical result — deterministic reliability scoring.',
+    status: 'Experimental',
   },
   'walk-forward': {
     title: 'Walk Forward Validation',
@@ -153,7 +151,6 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
 
 /** Placeholder views — rendered with the coming-soon module placeholder. */
 export const PLACEHOLDER_VIEWS: AppView[] = [
-  'reliability-engine',
   'walk-forward',
   'reports-daily',
   'reports-strategy',

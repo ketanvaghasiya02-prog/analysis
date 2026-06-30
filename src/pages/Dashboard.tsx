@@ -31,6 +31,7 @@ import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
 import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
+import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -104,6 +105,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <MarketContextView />
+      </AppLayout>
+    );
+  }
+
+  // Reliability Engine reads stored results, so it is dataset-independent.
+  if (view === 'reliability-engine') {
+    return (
+      <AppLayout>
+        <ReliabilityView />
       </AppLayout>
     );
   }
