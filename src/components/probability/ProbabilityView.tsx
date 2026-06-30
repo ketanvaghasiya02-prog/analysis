@@ -16,7 +16,9 @@ import {
   computeProbability,
   DEFAULT_PROBABILITY_INPUT,
   type ProbabilityInput,
+  type ProbabilityTargetRow,
 } from '@/utils/probability';
+import { OpportunityScanner } from '@/components/probability/OpportunityScanner';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { StatCard } from '@/components/overview/StatCard';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -77,8 +79,17 @@ export function ProbabilityView() {
   const syncOptions = filterOptions?.syncStatuses ?? [];
 
   const hasSl = input.stopLossGap !== null;
-  const nearest = result.rows[0] ?? null;
-  const deepest = result.rows[result.rows.length - 1] ?? null;
+
+  // KPI derivations from the existing matrix (no recalculation).
+  const rows = result.rows;
+  const highestProb =
+    rows.length > 0 ? rows.reduce((a, b) => (b.probabilityPct > a.probabilityPct ? b : a)) : null;
+  const target90 = rows
+    .filter((r) => r.probabilityPct >= 90)
+    .reduce<ProbabilityTargetRow | null>((deepest, r) => (!deepest || r.targetGap < deepest.targetGap ? r : deepest), null);
+  const recoveryTimes = rows.map((r) => r.avgTimeSec).filter((v): v is number => v !== null);
+  const avgRecovery = recoveryTimes.length ? recoveryTimes.reduce((a, b) => a + b, 0) / recoveryTimes.length : null;
+  const confidenceLabel = rows[0]?.confidenceLabel ?? '—';
 
   const warnings: string[] = [];
   if (input.targetStart < input.targetEnd) {
@@ -209,28 +220,36 @@ export function ProbabilityView() {
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* KPI cards */}
       <section>
         <h2 className="stat-label mb-2">Summary</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatCard label="Current Gap" value={fmtNumber(result.meta.currentGap, 2)} />
-          <StatCard label="Total Events" value={fmtInt(result.totalEvents)} tooltip="Historical events where the gap first crossed up to the Current Gap (one position at a time)." />
-          <StatCard label="Targets Tested" value={fmtInt(result.meta.targetsTested)} />
           <StatCard
-            label="Nearest Target Prob."
+            label="Highest Historical Probability"
             tone="positive"
-            value={nearest ? fmtPercent(nearest.probabilityPct) : '—'}
-            hint={nearest ? `to ${fmtNumber(nearest.targetGap, 2)}` : undefined}
-            tooltip="Historical probability of compressing to the highest (nearest) target."
+            value={highestProb ? fmtPercent(highestProb.probabilityPct) : '—'}
+            hint={highestProb ? `to ${fmtNumber(highestProb.targetGap, 2)}` : undefined}
+            tooltip="Highest historical compression probability across all tested targets."
           />
           <StatCard
-            label="Deepest Target Prob."
-            tone="warning"
-            value={deepest ? fmtPercent(deepest.probabilityPct) : '—'}
-            hint={deepest ? `to ${fmtNumber(deepest.targetGap, 2)}` : undefined}
-            tooltip="Historical probability of compressing all the way to the lowest target."
+            label="90% Probability Target"
+            tone="accent"
+            value={target90 ? fmtNumber(target90.targetGap, 2) : '—'}
+            hint={target90 ? `${fmtPercent(target90.probabilityPct)} historical` : 'none ≥ 90%'}
+            tooltip="Deepest target gap that still has at least 90% historical compression probability."
           />
-          <StatCard label="Research Confidence" value={nearest?.confidenceLabel ?? '—'} tooltip="Based on the number of historical events (the probability denominator)." />
+          <StatCard
+            label="Average Historical Recovery Time"
+            value={fmtDuration(avgRecovery)}
+            tooltip="Mean historical time-to-target across targets that were reached."
+          />
+          <StatCard
+            label="Largest Historical Dataset"
+            value={fmtInt(result.totalEvents)}
+            tooltip="Historical events where the gap first crossed up to the Current Gap (one position at a time)."
+          />
+          <StatCard label="Research Confidence" value={confidenceLabel} tooltip="Based on the number of historical events (the probability denominator)." />
         </div>
       </section>
 
@@ -291,18 +310,27 @@ export function ProbabilityView() {
         </footer>
       </section>
 
-      {/* Placeholder chart area — Phase 12B */}
+      {/* Historical Opportunity Scanner (Phase 12B) — reads the matrix above */}
+      <div className="flex items-center gap-3 pt-1">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Opportunity Intelligence</h2>
+        <span className="h-px flex-1 bg-panel-border" />
+        <span className="text-[11px] text-ink-faint">surfaces strong historical compressions</span>
+      </div>
+      <OpportunityScanner result={result} currentGap={input.currentGap} />
+
+      {/* Placeholder chart area — probability curve (planned) */}
       <section className="card p-5">
         <header className="mb-3 flex items-center gap-2">
           <ChartIcon className="text-base text-accent" />
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Probability Curve</h2>
           <span className="ml-auto rounded-full border border-panel-border bg-panel-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-            Phase 12B
+            Planned
           </span>
         </header>
         <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-panel-border bg-panel-raised/40 text-center text-sm text-ink-faint">
-          Probability-vs-target and time-to-target charts arrive in Phase 12B.
-          The matrix above already holds all the underlying historical values.
+          Probability-vs-target and time-to-target charts are planned. The matrix
+          and opportunity scanner above already hold all the underlying historical
+          values.
         </div>
       </section>
     </div>
