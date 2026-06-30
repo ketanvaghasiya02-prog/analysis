@@ -9,18 +9,14 @@ import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
   ClockIcon,
-  CompareIcon,
   DatabaseIcon,
   FileIcon,
   FlaskIcon,
   GaugeIcon,
   LayersIcon,
-  RankIcon,
   RecoveryIcon,
   ReplayIcon,
   SettingsIcon,
-  ShieldIcon,
-  SlidersIcon,
   TableIcon,
   TargetIcon,
   TrashIcon,
@@ -28,39 +24,66 @@ import {
 } from '@/components/common/icons';
 import type { AppView } from '@/context/DataContext';
 
+interface NavItem {
+  id: AppView;
+  label: string;
+  icon: typeof TableIcon;
+  badge?: string;
+}
+
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
 export function Sidebar() {
   const { dataset, validation, reset, view, setView, hasData, events } =
     useData();
 
-  const navItems: Array<{
-    id: AppView;
-    label: string;
-    icon: typeof TableIcon;
-    badge?: string;
-  }> = [
-    { id: 'overview', label: 'Overview', icon: TableIcon },
+  // Research-first navigation. Strategy-focused modules (Stop Loss Optimizer,
+  // Historical Strategy Finder, Strategy Ranking, Strategy Comparison) and the
+  // Recovery Matrix / MAE / Stop-Loss Research tabs are hidden from navigation
+  // for now; their routes remain intact and are simply not surfaced here.
+  const sections: NavSection[] = [
     {
-      id: 'events',
-      label: 'Events',
-      icon: LayersIcon,
-      badge: hasData ? fmtInt(events.events.length) : undefined,
+      items: [
+        { id: 'overview', label: 'Overview', icon: TableIcon },
+        {
+          id: 'events',
+          label: 'Events',
+          icon: LayersIcon,
+          badge: hasData ? fmtInt(events.events.length) : undefined,
+        },
+        { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
+        { id: 'failed', label: 'Failed Events', icon: WarningIcon },
+        { id: 'session', label: 'Session Analysis', icon: ClockIcon },
+        { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
+        { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
+      ],
     },
-    { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
-    { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
-    { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
-    { id: 'failed', label: 'Failed Events', icon: WarningIcon },
-    { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
-    { id: 'session', label: 'Session Analysis', icon: ClockIcon },
-    { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
-    { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
-    { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
-    { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
-    { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
-    { id: 'comparison', label: 'Strategy Comparison', icon: CompareIcon },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    {
+      title: 'Gap Research',
+      items: [
+        { id: 'gap-explorer', label: 'Gap Explorer', icon: TargetIcon },
+        { id: 'gap-lifecycle', label: 'Gap Lifecycle', icon: RecoveryIcon },
+        { id: 'gap-distribution', label: 'Gap Distribution', icon: ChartIcon },
+        { id: 'gap-statistics', label: 'Gap Statistics', icon: GaugeIcon },
+      ],
+    },
+    {
+      items: [{ id: 'settings', label: 'Settings', icon: SettingsIcon }],
+    },
   ];
 
-  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository', 'ranking', 'comparison']);
+  const alwaysEnabled = new Set<AppView>([
+    'overview',
+    'settings',
+    'repository',
+    'gap-explorer',
+    'gap-lifecycle',
+    'gap-distribution',
+    'gap-statistics',
+  ]);
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">
@@ -77,33 +100,42 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Nav */}
-        <nav className="mb-5 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = view === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setView(item.id)}
-                disabled={!hasData && !alwaysEnabled.has(item.id)}
-                className={[
-                  'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  active
-                    ? 'border border-accent/40 bg-accent/10 text-accent'
-                    : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
-                ].join(' ')}
-              >
-                <Icon className="text-base" />
-                {item.label}
-                {item.badge !== undefined && (
-                  <span className="ml-auto font-mono text-[11px] text-ink-faint">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <nav className="mb-5 space-y-4">
+          {sections.map((section, si) => (
+            <div key={section.title ?? `section-${si}`} className="space-y-1">
+              {section.title && (
+                <div className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
+                  {section.title}
+                </div>
+              )}
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = view === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setView(item.id)}
+                    disabled={!hasData && !alwaysEnabled.has(item.id)}
+                    className={[
+                      'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      active
+                        ? 'border border-accent/40 bg-accent/10 text-accent'
+                        : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
+                    ].join(' ')}
+                  >
+                    <Icon className="text-base" />
+                    {item.label}
+                    {item.badge !== undefined && (
+                      <span className="ml-auto font-mono text-[11px] text-ink-faint">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Upload */}

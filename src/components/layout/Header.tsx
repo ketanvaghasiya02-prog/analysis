@@ -52,9 +52,17 @@ export function Header() {
                                 ? 'Historical Evidence Replay'
                                 : view === 'comparison'
                                   ? 'Strategy Comparison'
-                                  : view === 'settings'
-                                    ? 'Settings'
-                                    : 'Gap Analysis Overview';
+                                  : view === 'gap-explorer'
+                                    ? 'Gap Explorer'
+                                    : view === 'gap-lifecycle'
+                                      ? 'Gap Lifecycle'
+                                      : view === 'gap-distribution'
+                                        ? 'Gap Distribution'
+                                        : view === 'gap-statistics'
+                                          ? 'Gap Statistics'
+                                          : view === 'settings'
+                                            ? 'Settings'
+                                            : 'Gap Analysis Overview';
 
   const range = validation?.dateRange;
   const rangeLabel =
