@@ -136,9 +136,6 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: 'Reporting Engine', icon: FileIcon, view: 'reports' },
       { label: 'EA Export Engine', icon: DatabaseIcon, view: 'ea-export' },
-      { label: 'Daily Reports', icon: FileIcon, view: 'reports-daily' },
-      { label: 'Strategy Reports', icon: FileIcon, view: 'reports-strategy' },
-      { label: 'Probability Reports', icon: FileIcon, view: 'reports-probability' },
     ],
   },
   {
