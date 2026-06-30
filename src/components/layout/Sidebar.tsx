@@ -1,13 +1,20 @@
 /**
- * Left navigation sidebar: brand, view navigation, upload control, loaded-file
- * list and day-bucket overview.
+ * Left navigation sidebar: brand, collapsible section navigation, upload
+ * control, loaded-file list and day-bucket overview.
+ *
+ * Navigation is organised into collapsible sections (Dashboard, Research,
+ * Reports, Settings). Every existing route remains accessible — modules are
+ * only grouped, never removed. Expanded/collapsed state is remembered, and the
+ * section containing the active page is expanded automatically.
  */
 
+import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import { useData } from '@/context/DataContext';
 import { FileUpload } from '@/components/upload/FileUpload';
 import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
+  ChevronIcon,
   ClockIcon,
   CompareIcon,
   DatabaseIcon,
@@ -28,39 +35,144 @@ import {
 } from '@/components/common/icons';
 import type { AppView } from '@/context/DataContext';
 
-export function Sidebar() {
-  const { dataset, validation, reset, view, setView, hasData, events } =
-    useData();
+type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-  const navItems: Array<{
-    id: AppView;
-    label: string;
-    icon: typeof TableIcon;
-    badge?: string;
-  }> = [
-    { id: 'overview', label: 'Overview', icon: TableIcon },
+interface NavItem {
+  id: AppView;
+  label: string;
+  icon: Icon;
+  badge?: string;
+}
+
+interface NavSection {
+  id: string;
+  title: string;
+  icon: Icon;
+  items: NavItem[];
+}
+
+const STORAGE_KEY = 'grt.sidebar.sections.v1';
+const DEFAULT_EXPANDED: Record<string, boolean> = {
+  dashboard: true,
+  research: true,
+  reports: true,
+  settings: true,
+};
+
+function loadExpanded(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_EXPANDED };
+    return { ...DEFAULT_EXPANDED, ...(JSON.parse(raw) as Record<string, boolean>) };
+  } catch {
+    return { ...DEFAULT_EXPANDED };
+  }
+}
+
+function saveExpanded(state: Record<string, boolean>): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore persistence errors */
+  }
+}
+
+// Views reachable without a loaded dataset (read stored results, render a
+// graceful empty state, or are static placeholders).
+const ALWAYS_ENABLED = new Set<AppView>([
+  'overview',
+  'settings',
+  'repository',
+  'ranking',
+  'strategy-details',
+  'replay',
+  'comparison',
+  'market-intelligence',
+  'probability-engine',
+  'reliability-engine',
+  'walk-forward',
+  'reports-daily',
+  'reports-strategy',
+  'reports-probability',
+]);
+
+export function Sidebar() {
+  const { dataset, validation, reset, view, setView, hasData, events } = useData();
+
+  const sections: NavSection[] = [
     {
-      id: 'events',
-      label: 'Events',
-      icon: LayersIcon,
-      badge: hasData ? fmtInt(events.events.length) : undefined,
+      id: 'dashboard',
+      title: 'Dashboard',
+      icon: ChartIcon,
+      items: [
+        { id: 'overview', label: 'Overview', icon: TableIcon },
+        { id: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon },
+        {
+          id: 'events',
+          label: 'Events',
+          icon: LayersIcon,
+          badge: hasData ? fmtInt(events.events.length) : undefined,
+        },
+        { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
+        { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
+        { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
+        { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
+        { id: 'failed', label: 'Failed Events', icon: WarningIcon },
+        { id: 'session', label: 'Session Analysis', icon: ClockIcon },
+      ],
     },
-    { id: 'recovery', label: 'Recovery Matrix', icon: RecoveryIcon },
-    { id: 'mae', label: 'MAE Analysis', icon: GaugeIcon },
-    { id: 'stoploss', label: 'Stop-Loss Research', icon: ShieldIcon },
-    { id: 'failed', label: 'Failed Events', icon: WarningIcon },
-    { id: 'explorer', label: 'Event Explorer', icon: ReplayIcon },
-    { id: 'session', label: 'Session Analysis', icon: ClockIcon },
-    { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
-    { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
-    { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
-    { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
-    { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
-    { id: 'comparison', label: 'Strategy Comparison', icon: CompareIcon },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    {
+      id: 'research',
+      title: 'Research',
+      icon: FlaskIcon,
+      items: [
+        { id: 'lab', label: 'Research Lab', icon: FlaskIcon },
+        { id: 'sl-optimizer', label: 'Stop Loss Optimizer', icon: SlidersIcon },
+        { id: 'strategy-finder', label: 'Historical Strategy Finder', icon: TargetIcon },
+        { id: 'repository', label: 'Research Repository', icon: DatabaseIcon },
+        { id: 'ranking', label: 'Strategy Ranking', icon: RankIcon },
+        { id: 'strategy-details', label: 'Strategy Details', icon: FileIcon },
+        { id: 'replay', label: 'Replay Engine', icon: ReplayIcon },
+        { id: 'comparison', label: 'Strategy Comparison', icon: CompareIcon },
+        { id: 'probability-engine', label: 'Probability Engine', icon: GaugeIcon },
+        { id: 'reliability-engine', label: 'Reliability Engine', icon: ShieldIcon },
+        { id: 'walk-forward', label: 'Walk Forward Validation', icon: TargetIcon },
+      ],
+    },
+    {
+      id: 'reports',
+      title: 'Reports',
+      icon: FileIcon,
+      items: [
+        { id: 'reports-daily', label: 'Daily Reports', icon: FileIcon },
+        { id: 'reports-strategy', label: 'Strategy Reports', icon: FileIcon },
+        { id: 'reports-probability', label: 'Probability Reports', icon: FileIcon },
+      ],
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: SettingsIcon,
+      items: [{ id: 'settings', label: 'Settings', icon: SettingsIcon }],
+    },
   ];
 
-  const alwaysEnabled = new Set<AppView>(['overview', 'settings', 'repository', 'ranking', 'comparison']);
+  const activeSectionId = sections.find((s) => s.items.some((i) => i.id === view))?.id;
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(loadExpanded);
+
+  useEffect(() => {
+    saveExpanded(expanded);
+  }, [expanded]);
+
+  // Auto-expand the section that contains the active page.
+  useEffect(() => {
+    if (!activeSectionId) return;
+    setExpanded((prev) => (prev[activeSectionId] ? prev : { ...prev, [activeSectionId]: true }));
+  }, [activeSectionId]);
+
+  const toggleSection = (id: string) =>
+    setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? true) }));
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-panel-border bg-panel">
@@ -70,38 +182,61 @@ export function Sidebar() {
           <ChartIcon className="text-xl" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold text-ink">MT5 Gap Monitor</div>
-          <div className="text-[11px] text-ink-faint">CSV Research Console</div>
+          <div className="text-sm font-semibold text-ink">Gap Research Terminal</div>
+          <div className="text-[11px] text-ink-faint">Professional CSV-Based Pair Research Platform</div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Nav */}
-        <nav className="mb-5 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = view === item.id;
+        <nav className="mb-5 space-y-3">
+          {sections.map((section) => {
+            const SectionIcon = section.icon;
+            const open = expanded[section.id] ?? true;
             return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setView(item.id)}
-                disabled={!hasData && !alwaysEnabled.has(item.id)}
-                className={[
-                  'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  active
-                    ? 'border border-accent/40 bg-accent/10 text-accent'
-                    : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
-                ].join(' ')}
-              >
-                <Icon className="text-base" />
-                {item.label}
-                {item.badge !== undefined && (
-                  <span className="ml-auto font-mono text-[11px] text-ink-faint">
-                    {item.badge}
-                  </span>
+              <div key={section.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.id)}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint transition-colors hover:text-ink"
+                >
+                  <SectionIcon className="text-sm" />
+                  <span>{section.title}</span>
+                  <ChevronIcon
+                    className={['ml-auto text-sm transition-transform', open ? '' : '-rotate-90'].join(' ')}
+                  />
+                </button>
+                {open && (
+                  <div className="mt-1 space-y-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = view === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setView(item.id)}
+                          disabled={!hasData && !ALWAYS_ENABLED.has(item.id)}
+                          className={[
+                            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            active
+                              ? 'border border-accent/40 bg-accent/10 text-accent'
+                              : 'border border-transparent text-ink-muted hover:bg-panel-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
+                          ].join(' ')}
+                        >
+                          <Icon className="text-base" />
+                          {item.label}
+                          {item.badge !== undefined && (
+                            <span className="ml-auto font-mono text-[11px] text-ink-faint">
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </nav>

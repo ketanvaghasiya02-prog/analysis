@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 /** Three-zone institutional shell: sidebar · header · scrollable main. */
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -12,7 +13,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="flex-1 overflow-y-auto px-6 py-5">{children}</main>
+        <main className="flex-1 overflow-y-auto px-6 py-5">
+          <PageHeader />
+          {children}
+        </main>
       </div>
     </div>
   );

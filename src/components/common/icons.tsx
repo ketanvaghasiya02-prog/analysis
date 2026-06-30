@@ -179,6 +179,14 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+export function ChevronIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 export function CompareIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

@@ -21,7 +21,7 @@ export function Header() {
     view,
   } = useData();
 
-  const title =
+  const legacyTitle =
     view === 'events'
       ? 'Zone Event Analysis'
       : view === 'recovery'
@@ -55,6 +55,18 @@ export function Header() {
                                   : view === 'settings'
                                     ? 'Settings'
                                     : 'Gap Analysis Overview';
+
+  // Titles for the newer placeholder modules (top bar otherwise unchanged).
+  const placeholderTitles: Partial<Record<typeof view, string>> = {
+    'market-intelligence': 'Market Intelligence',
+    'probability-engine': 'Probability Engine',
+    'reliability-engine': 'Reliability Engine',
+    'walk-forward': 'Walk Forward Validation',
+    'reports-daily': 'Daily Reports',
+    'reports-strategy': 'Strategy Reports',
+    'reports-probability': 'Probability Reports',
+  };
+  const title = placeholderTitles[view] ?? legacyTitle;
 
   const range = validation?.dateRange;
   const rangeLabel =

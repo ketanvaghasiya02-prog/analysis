@@ -66,6 +66,13 @@ export type AppView =
   | 'strategy-details'
   | 'replay'
   | 'comparison'
+  | 'market-intelligence'
+  | 'probability-engine'
+  | 'reliability-engine'
+  | 'walk-forward'
+  | 'reports-daily'
+  | 'reports-strategy'
+  | 'reports-probability'
   | 'settings';
 
 interface DataContextValue {

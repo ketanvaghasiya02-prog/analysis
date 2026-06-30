@@ -27,6 +27,8 @@ import { StrategyRankingView } from '@/components/ranking/StrategyRankingView';
 import { StrategyDetailsView } from '@/components/details/StrategyDetailsView';
 import { ReplayView } from '@/components/replay/ReplayView';
 import { ComparisonView } from '@/components/comparison/ComparisonView';
+import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
+import { isPlaceholderView } from '@/components/layout/moduleMeta';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -82,6 +84,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ComparisonView />
+      </AppLayout>
+    );
+  }
+
+  // Future modules — professional "coming soon" placeholders (no dataset needed).
+  if (isPlaceholderView(view)) {
+    return (
+      <AppLayout>
+        <ModulePlaceholder />
       </AppLayout>
     );
   }
