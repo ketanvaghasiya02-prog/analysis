@@ -127,9 +127,17 @@ export function buildSessionAnalysis(
   }
 
   // Per-event MAE records grouped by entry session.
+  //
+  // Part 7: invalid events (entry tick not in-sync) are excluded so unreliable
+  // crossings never affect Same-Day Recovery statistics. The global Sync filter
+  // removes unsynced *samples* upstream; this guards the remaining quality flag.
+  //
+  // Part 6: recovery is defined by computeEventMae using the inclusive boundary
+  // gap <= zone.low + EPS (mae.ts EPS = 1e-9), shared by every session metric.
   const zoneById = new Map(zones.map((z) => [z.id, z]));
   const recordsBySession = new Map<string, EventRecord[]>();
   for (const event of events) {
+    if (event.quality === 'invalid') continue;
     const zone = zoneById.get(event.zoneId);
     if (!zone) continue;
     const mae = computeEventMae(samples, event, zone.low);

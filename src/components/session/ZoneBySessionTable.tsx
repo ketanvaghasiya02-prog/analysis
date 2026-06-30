@@ -8,6 +8,10 @@ import { useMemo } from 'react';
 import type { SessionStat } from '@/utils/sessions';
 import { fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
 import { TableIcon } from '@/components/common/icons';
+import { InfoTip } from '@/components/common/InfoTip';
+
+const RECOVERY_TIP =
+  'Same-Day Recovery % = events where the gap returned to the zone low on the same trading day. Stop Loss is not used on this page.';
 
 interface Row {
   session: string;
@@ -64,8 +68,10 @@ export function ZoneBySessionTable({ sessions }: { sessions: SessionStat[] }) {
                 <th className="px-3 py-2 font-medium">Session</th>
                 <th className="px-3 py-2 font-medium">Zone</th>
                 <th className="px-3 py-2 text-right font-medium">Events</th>
-                <th className="px-3 py-2 text-right font-medium">Recovered</th>
-                <th className="px-3 py-2 text-right font-medium">Recovery %</th>
+                <th className="px-3 py-2 text-right font-medium">Recovered (same-day)</th>
+                <th className="px-3 py-2 text-right font-medium">
+                  <span className="inline-flex items-center">Same-Day Recovery %<InfoTip text={RECOVERY_TIP} /></span>
+                </th>
                 <th className="px-3 py-2 text-right font-medium">Worst Max Gap</th>
               </tr>
             </thead>

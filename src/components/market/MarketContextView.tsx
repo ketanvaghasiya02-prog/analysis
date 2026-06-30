@@ -35,8 +35,10 @@ import {
   type RegimeTone,
 } from '@/utils/marketContext';
 import { downloadExport } from '@/utils/reports';
+import { isFilterActive } from '@/utils/filters';
 import { ChipMultiSelect } from '@/components/filters/ChipMultiSelect';
 import { StatCard } from '@/components/overview/StatCard';
+import { InfoTip } from '@/components/common/InfoTip';
 import { EmptyState } from '@/components/common/EmptyState';
 import { fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
 import { AlertIcon, ChartIcon, DownloadIcon, GaugeIcon } from '@/components/common/icons';
@@ -74,18 +76,35 @@ const TONE_BG: Record<RegimeTone, string> = {
 };
 
 export function MarketContextView() {
-  const { dataset, filterOptions } = useData();
+  const { dataset, filteredSamples, filters, filterOptions } = useData();
   const [input, setInput] = useState<MarketContextInput>(DEFAULT_MARKET_CONTEXT_INPUT);
 
-  const samples = dataset?.samples ?? [];
+  // Part 1: Market Intelligence consumes the SAME globally filtered pipeline as
+  // the rest of the app (analysis mode + global date / session / sync / symbol /
+  // gap filters), then applies its own in-page session filter and window.
+  const samples = filteredSamples;
+  const globalFiltersActive = isFilterActive(filters);
   const ctx = useMemo(() => buildMarketContext(samples, input), [samples, input]);
   const sessionOptions = filterOptions?.sessions ?? [];
 
-  if (!ctx.hasData || !ctx.current) {
+  if (!dataset || dataset.samples.length === 0) {
     return (
       <EmptyState
         title="No uploaded data"
         description="Upload one or more GapMonitor CSV exports to describe the current market context. The Market Context Engine reads only your uploaded history — it never predicts."
+      />
+    );
+  }
+
+  if (!ctx.hasData || !ctx.current) {
+    return (
+      <EmptyState
+        title="No samples match the current filters"
+        description={
+          input.sessions.length
+            ? `No sample exists for the selected session filter (${input.sessions.join(', ')}) within the active global filters. Clear the in-page session filter or adjust the global filters.`
+            : 'The active global filters leave no samples for the Market Context Engine. Adjust the global Date / Session / Sync / Symbol / Gap filters.'
+        }
       />
     );
   }
@@ -122,11 +141,16 @@ export function MarketContextView() {
             <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
               Market Context Engine v1.0
             </span>
+            {globalFiltersActive && (
+              <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                Using global filtered dataset
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-ink-muted">
             A statistical description of where the current gap sits within recent
             history. This is context only — never a prediction, recommendation or
-            trading signal.
+            trading signal.{globalFiltersActive ? ' Global filters are active — the analysis uses the same filtered dataset as the rest of the app.' : ''}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -179,7 +203,7 @@ export function MarketContextView() {
               }}
               className="rounded-md border border-panel-border bg-panel px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
             />
-            <span className="text-[10px] text-ink-faint">Advisory cap 30. Larger windows are flagged.</span>
+            <span className="text-[10px] text-ink-faint">Default 30. The effective window never exceeds this.</span>
           </label>
           <label className="flex flex-col gap-1">
             <span className="stat-label">Current Gap (override)</span>
@@ -213,24 +237,48 @@ export function MarketContextView() {
         </div>
       </section>
 
-      {ctx.windowCapped && (
-        <section className="card flex items-start gap-3 border-warning/40 bg-warning/10 p-4">
-          <AlertIcon className="mt-0.5 text-base text-warning" />
-          <p className="text-sm leading-relaxed text-ink-muted">
-            The selected window of <span className="font-semibold text-warning">{fmtInt(ctx.windowDays)} days</span> exceeds the
-            advisory maximum of {fmtInt(ctx.maxWindowDays)} days. Gold Spot vs Gold Futures naturally converge toward expiry, so
-            older gaps may not represent the current contract. Long windows are descriptive only and shown because you requested them.
+      {/* Effective window — real, not advisory (Part 2). */}
+      <section className="card p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="stat-label">Effective Window</h2>
+          <InfoTip text="The window actually used = min(Requested, Maximum, Available trading days). It can never exceed your uploaded data or the maximum window." />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-md border border-panel-border bg-panel px-3 py-2">
+            <div className="stat-label">Requested Window</div>
+            <div className="font-mono text-base font-semibold text-ink">{fmtInt(ctx.requestedWindowDays)}d</div>
+          </div>
+          <div className="rounded-md border border-panel-border bg-panel px-3 py-2">
+            <div className="stat-label">Maximum Window</div>
+            <div className="font-mono text-base font-semibold text-ink">{fmtInt(ctx.maxWindowDays)}d</div>
+          </div>
+          <div className="rounded-md border border-panel-border bg-panel px-3 py-2">
+            <div className="stat-label">Available Trading Days</div>
+            <div className="font-mono text-base font-semibold text-ink">{fmtInt(ctx.availableTradingDays)}d</div>
+          </div>
+          <div className={['rounded-md border px-3 py-2', ctx.windowCapped ? 'border-warning/40 bg-warning/10' : 'border-panel-border bg-panel'].join(' ')}>
+            <div className="stat-label">Effective Window</div>
+            <div className={['font-mono text-base font-semibold', ctx.windowCapped ? 'text-warning' : 'text-ink'].join(' ')}>{fmtInt(ctx.effectiveWindowDays)}d</div>
+          </div>
+        </div>
+        {ctx.windowCapped && (
+          <p className="mt-3 flex items-start gap-2 text-sm leading-relaxed text-ink-muted">
+            <AlertIcon className="mt-0.5 shrink-0 text-base text-warning" />
+            <span>
+              Effective Window: <span className="font-semibold text-warning">{fmtInt(ctx.effectiveWindowDays)} trading day{ctx.effectiveWindowDays === 1 ? '' : 's'}</span> of requested {fmtInt(ctx.requestedWindowDays)} days
+              {ctx.requestedWindowDays > ctx.maxWindowDays ? ` — capped at the ${fmtInt(ctx.maxWindowDays)}-day maximum` : ''}
+              {ctx.availableTradingDays < ctx.requestedWindowDays ? ` — only ${fmtInt(ctx.availableTradingDays)} trading day${ctx.availableTradingDays === 1 ? '' : 's'} are available in the current dataset` : ''}.
+            </span>
           </p>
-        </section>
-      )}
-
-      {ctx.windowDayCount > 0 && (
-        <p className="text-[11px] text-ink-faint">
-          Window: {ctx.windowStartDay} → {ctx.windowEndDay} · {fmtInt(ctx.windowDayCount)} trading days · {fmtInt(ctx.windowSampleCount)} samples.
-          Current sample: {cur.day} {cur.time}.
-          {ctx.currentGapIsOverride ? ' Current gap is a manual override.' : ''}
-        </p>
-      )}
+        )}
+        {ctx.windowDayCount > 0 && (
+          <p className="mt-2 text-[11px] text-ink-faint">
+            Window: {ctx.windowStartDay} → {ctx.windowEndDay} · {fmtInt(ctx.windowDayCount)} trading days · {fmtInt(ctx.windowSampleCount)} samples.
+            Current sample: {cur.day} {cur.time}{input.sessions.length ? ` · session ${cur.session}` : ''}.
+            {ctx.currentGapIsOverride ? ' Current gap is a manual override.' : ''}
+          </p>
+        )}
+      </section>
 
       {/* Summary cards */}
       <section>

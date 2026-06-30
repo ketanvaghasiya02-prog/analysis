@@ -3,12 +3,16 @@
  */
 
 import type { SessionStat } from '@/utils/sessions';
+import { InfoTip } from '@/components/common/InfoTip';
 import {
   fmtDuration,
   fmtInt,
   fmtNumber,
   fmtPercent,
 } from '@/utils/format';
+
+const RECOVERY_TIP =
+  'Same-Day Recovery % = events where the gap returned to the zone low on the same trading day. Stop Loss is not used on this page.';
 
 function Row({
   label,
@@ -42,7 +46,7 @@ export function SessionComparisonCards({
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {sessions.map((s) => (
         <div key={s.session} className="card p-4">
-          <header className="mb-2 flex items-center justify-between">
+          <header className="mb-1 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-ink">{s.session}</h3>
             <span
               className={[
@@ -53,12 +57,16 @@ export function SessionComparisonCards({
               {fmtPercent(s.recoveryPct)}
             </span>
           </header>
+          <div className="mb-2 flex items-center text-[10px] uppercase tracking-wide text-ink-faint">
+            Same-Day Recovery
+            <InfoTip text={RECOVERY_TIP} />
+          </div>
 
           <div className="divide-y divide-panel-border">
             <Row label="Samples" value={fmtInt(s.samples)} />
             <Row label="Events" value={fmtInt(s.events)} />
             <Row
-              label="Failed events"
+              label="Not recovered (same-day)"
               value={fmtInt(s.failed)}
               tone={s.failed > 0 ? 'text-negative' : 'text-ink'}
             />

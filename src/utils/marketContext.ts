@@ -80,8 +80,16 @@ export interface MarketRegime {
 
 export interface MarketContext {
   hasData: boolean;
+  /** The window the user requested (days). */
   windowDays: number;
+  /** Alias of windowDays — what the user asked for, before clamping. */
+  requestedWindowDays: number;
   maxWindowDays: number;
+  /** Distinct trading days actually present in the (filtered) upload. */
+  availableTradingDays: number;
+  /** The window actually used: min(requested, maximum, available). Part 2. */
+  effectiveWindowDays: number;
+  /** True when the requested window was reduced (by the max or by available data). */
   windowCapped: boolean;
   currentGapIsOverride: boolean;
   windowDayCount: number;
@@ -220,14 +228,17 @@ function buildHistogram(gaps: number[], current: number, binCount = 16): Histogr
 
 /** Builds the market context. Pure and read-only. */
 export function buildMarketContext(samples: GapSample[], input: MarketContextInput): MarketContext {
-  const windowDays = input.windowDays > 0 ? Math.round(input.windowDays) : DEFAULT_WINDOW_DAYS;
+  const requestedWindowDays = input.windowDays > 0 ? Math.round(input.windowDays) : DEFAULT_WINDOW_DAYS;
 
   const maxWindowDays = input.maxWindowDays > 0 ? Math.round(input.maxWindowDays) : DEFAULT_MAX_WINDOW_DAYS;
   const empty: MarketContext = {
     hasData: false,
-    windowDays,
+    windowDays: requestedWindowDays,
+    requestedWindowDays,
     maxWindowDays,
-    windowCapped: windowDays > maxWindowDays,
+    availableTradingDays: 0,
+    effectiveWindowDays: 0,
+    windowCapped: false,
     currentGapIsOverride: input.currentGapOverride !== null,
     windowDayCount: 0,
     windowStartDay: null,
@@ -259,28 +270,38 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
 
   if (samples.length === 0) return empty;
 
-  // Latest valid sample = current market state.
+  // The in-page session filter scopes EVERY recent-window metric AND the
+  // current-sample pick, so the current gap is apples-to-apples with the
+  // comparison window (Part 3). Defined before the current-sample loop.
+  const sessionSet = input.sessions.length ? new Set(input.sessions) : null;
+  const inSession = (s: GapSample) => !sessionSet || sessionSet.has(s.currentSession);
+
+  // Current market state = the latest in-session sample with a gap. When a
+  // session filter is active this is the latest sample inside that session, not
+  // the latest all-session sample (Part 3).
   let current: GapSample | null = null;
   for (let i = samples.length - 1; i >= 0; i -= 1) {
     const s = samples[i]!;
-    if (s.gap !== null) {
+    if (s.gap !== null && inSession(s)) {
       current = s;
       break;
     }
   }
   if (!current) return empty;
 
-  // Recent window = the last `windowDays` distinct trading days. The session
-  // filter (if any) scopes every recent-window metric.
-  const sessionSet = input.sessions.length ? new Set(input.sessions) : null;
-  const inSession = (s: GapSample) => !sessionSet || sessionSet.has(s.currentSession);
+  // Effective window is REAL, not advisory: the last N distinct trading days
+  // where N = min(requested, maximum, available days). It can never exceed the
+  // uploaded data nor the maximum window (Part 2).
   const dayKeys = Array.from(new Set(samples.map((s) => s.dayKey))).filter((d) => d && d !== 'unknown').sort();
-  const windowDayKeys = new Set(dayKeys.slice(Math.max(0, dayKeys.length - windowDays)));
+  const availableTradingDays = dayKeys.length;
+  const effectiveWindowDays = Math.max(0, Math.min(requestedWindowDays, maxWindowDays, availableTradingDays));
+  const windowCapped = requestedWindowDays > effectiveWindowDays;
+  const windowDayKeys = new Set(dayKeys.slice(Math.max(0, dayKeys.length - effectiveWindowDays)));
   const windowSamples = samples.filter((s) => windowDayKeys.has(s.dayKey) && inSession(s));
   const windowGaps = gapsOf(windowSamples);
   const allGaps = gapsOf(samples.filter(inSession));
 
-  // Current gap: an explicit override, else the latest sample's gap.
+  // Current gap: an explicit override, else the latest in-session sample's gap.
   const currentGap = input.currentGapOverride ?? current.gap!;
   const gapPercentileRecent = percentileBelow(windowGaps, currentGap);
   const gapPercentileAll = percentileBelow(allGaps, currentGap);
@@ -343,16 +364,49 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
   const regime = { label: `${gapState} · ${volState}`, tone: regimeTone, gapState, volState };
 
   // Deterministic market regime: Normal / Expansion / Compression / Transition.
+  // The reason text states the ACTUAL trigger (trend / move-share / volatility
+  // percentile), never a current-vs-average story that didn't drive it (Part 4).
   const highVol = volPercentile >= 70;
+  const upPct = Math.round(expansionPct);
+  const downPct = Math.round(compressionPct);
+  const volPct = Math.round(volPercentile);
   let marketRegime: MarketRegime;
   if (highVol && trend === 'stable') {
-    marketRegime = { kind: 'Transition', tone: 'warning', reason: 'High recent volatility with no clear directional trend.' };
-  } else if (trend === 'expanding' || expansionPct >= 60) {
-    marketRegime = { kind: 'Expansion', tone: 'negative', reason: 'The gap has been widening relative to its recent average.' };
-  } else if (trend === 'compressing' || compressionPct >= 60) {
-    marketRegime = { kind: 'Compression', tone: 'positive', reason: 'The gap has been compressing relative to its recent average.' };
+    marketRegime = {
+      kind: 'Transition',
+      tone: 'warning',
+      reason: `Transition regime: recent volatility sits at the ${volPct}th percentile of daily volatility (≥70th) with no clear directional trend.`,
+    };
+  } else if (trend === 'expanding') {
+    marketRegime = {
+      kind: 'Expansion',
+      tone: 'negative',
+      reason: 'Expansion regime detected from trend: the most recent gaps (last ~10% of the window) averaged above the window mean by more than a quarter of recent volatility.',
+    };
+  } else if (expansionPct >= 60) {
+    marketRegime = {
+      kind: 'Expansion',
+      tone: 'negative',
+      reason: `Expansion regime detected because upward gap moves represented ${upPct}% of recent row-to-row changes (≥60%).`,
+    };
+  } else if (trend === 'compressing') {
+    marketRegime = {
+      kind: 'Compression',
+      tone: 'positive',
+      reason: 'Compression regime detected from trend: the most recent gaps (last ~10% of the window) averaged below the window mean by more than a quarter of recent volatility.',
+    };
+  } else if (compressionPct >= 60) {
+    marketRegime = {
+      kind: 'Compression',
+      tone: 'positive',
+      reason: `Compression regime detected because downward gap moves represented ${downPct}% of recent row-to-row changes (≥60%).`,
+    };
   } else {
-    marketRegime = { kind: 'Normal', tone: 'accent', reason: 'Recent behaviour is broadly stable around its average.' };
+    marketRegime = {
+      kind: 'Normal',
+      tone: 'accent',
+      reason: `Normal regime: recent row-to-row moves are balanced (up ${upPct}% / down ${downPct}%) with volatility at the ${volPct}th percentile.`,
+    };
   }
 
   // Contract age + roll detection.
@@ -393,12 +447,15 @@ export function buildMarketContext(samples: GapSample[], input: MarketContextInp
 
   return {
     hasData: true,
-    windowDays,
+    windowDays: requestedWindowDays,
+    requestedWindowDays,
     maxWindowDays,
-    windowCapped: windowDays > maxWindowDays,
+    availableTradingDays,
+    effectiveWindowDays,
+    windowCapped,
     currentGapIsOverride: input.currentGapOverride !== null,
     windowDayCount: windowDayKeys.size,
-    windowStartDay: dayKeys[Math.max(0, dayKeys.length - windowDays)] ?? null,
+    windowStartDay: dayKeys[Math.max(0, dayKeys.length - effectiveWindowDays)] ?? null,
     windowEndDay: dayKeys[dayKeys.length - 1] ?? null,
     windowSampleCount: windowSamples.length,
     current: {
@@ -539,7 +596,7 @@ export function marketContextJson(ctx: MarketContext, generatedAt: string): Seri
   const payload = {
     note: 'Market context describes where today stands relative to recent history. Descriptive only — never a prediction, recommendation or signal.',
     generatedAt,
-    window: { days: ctx.windowDays, maxDays: ctx.maxWindowDays, capped: ctx.windowCapped, daysCovered: ctx.windowDayCount, samples: ctx.windowSampleCount, start: ctx.windowStartDay, end: ctx.windowEndDay },
+    window: { requestedDays: ctx.requestedWindowDays, maxDays: ctx.maxWindowDays, availableTradingDays: ctx.availableTradingDays, effectiveDays: ctx.effectiveWindowDays, capped: ctx.windowCapped, daysCovered: ctx.windowDayCount, samples: ctx.windowSampleCount, start: ctx.windowStartDay, end: ctx.windowEndDay },
     current: ctx.current,
     gapPercentileRecent: ctx.gapPercentileRecent,
     gapPercentileAll: ctx.gapPercentileAll,
