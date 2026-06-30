@@ -35,6 +35,7 @@ import { UniversalSearchView } from '@/components/search/UniversalSearchView';
 import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
 import { AiAssistantView } from '@/components/assistant/AiAssistantView';
 import { EaExportView } from '@/components/eaexport/EaExportView';
+import { QaView } from '@/components/qa/QaView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
@@ -165,6 +166,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <EaExportView />
+      </AppLayout>
+    );
+  }
+
+  // Quality Assurance runs against the frozen engines; dataset-independent.
+  if (view === 'qa') {
+    return (
+      <AppLayout>
+        <QaView />
       </AppLayout>
     );
   }

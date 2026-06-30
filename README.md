@@ -106,6 +106,9 @@ Standards every change must follow:
   no duplicate calculations, caching, caps.
 - **[VALIDATION.md](docs/VALIDATION.md)** — manual CSV verification, edge cases,
   acceptance checklist, regression testing.
+- **[QUALITY_ASSURANCE.md](docs/QUALITY_ASSURANCE.md)** — the permanent testing
+  framework: quality levels, module test matrix, golden datasets, release gate,
+  bug classification and the quality certificate (run in-app at Settings → Quality Assurance).
 
 > Frozen modules (Research Engine, Research Lab, Stop Loss Optimizer, Historical
 > Strategy Finder, Research Repository, Strategy Ranking, Probability Engine)

@@ -73,6 +73,7 @@ export type AppView =
   | 'walk-forward'
   | 'assistant'
   | 'ea-export'
+  | 'qa'
   | 'reports'
   | 'reports-daily'
   | 'reports-strategy'

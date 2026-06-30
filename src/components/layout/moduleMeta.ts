@@ -140,6 +140,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'Export verified research as standardized config profiles (JSON / CSV / YAML / XML). No trading code.',
     status: 'Experimental',
   },
+  qa: {
+    title: 'Quality Assurance',
+    description: 'Permanent testing framework — verifies CSV reproducibility and determinism, and issues the release certificate.',
+    status: 'Stable',
+  },
   'reports-daily': {
     title: 'Daily Reports',
     description: 'Per-day summaries of gap activity and outcomes.',

@@ -96,6 +96,7 @@ const ALWAYS_ENABLED = new Set<AppView>([
   'walk-forward',
   'assistant',
   'ea-export',
+  'qa',
   'reports',
   'reports-daily',
   'reports-strategy',
@@ -163,7 +164,10 @@ export function Sidebar() {
       id: 'settings',
       title: 'Settings',
       icon: SettingsIcon,
-      items: [{ id: 'settings', label: 'Settings', icon: SettingsIcon }],
+      items: [
+        { id: 'qa', label: 'Quality Assurance', icon: ShieldIcon },
+        { id: 'settings', label: 'Settings', icon: SettingsIcon },
+      ],
     },
   ];
 
