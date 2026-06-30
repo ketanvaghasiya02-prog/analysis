@@ -117,10 +117,8 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
   },
   'walk-forward': {
     title: 'Walk Forward Validation',
-    description: 'Out-of-sample style validation across historical windows.',
-    status: 'Coming Soon',
-    about:
-      'Walk Forward Validation will split the uploaded history into sequential windows and check how a strategy’s historical statistics hold up window-to-window, highlighting periods of agreement and divergence. It is a descriptive robustness check over stored data — not a live test and not a prediction.',
+    description: 'Validate a stored strategy on unseen historical windows (training vs validation).',
+    status: 'Experimental',
   },
   'reports-daily': {
     title: 'Daily Reports',
@@ -151,7 +149,6 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
 
 /** Placeholder views — rendered with the coming-soon module placeholder. */
 export const PLACEHOLDER_VIEWS: AppView[] = [
-  'walk-forward',
   'reports-daily',
   'reports-strategy',
   'reports-probability',

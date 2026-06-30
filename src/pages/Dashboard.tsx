@@ -32,6 +32,7 @@ import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
+import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -114,6 +115,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ReliabilityView />
+      </AppLayout>
+    );
+  }
+
+  // Walk Forward Validation reads stored results, so it is dataset-independent.
+  if (view === 'walk-forward') {
+    return (
+      <AppLayout>
+        <WalkForwardView />
       </AppLayout>
     );
   }
