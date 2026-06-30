@@ -241,6 +241,24 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function PinIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 17v5" />
+      <path d="M9 10.76V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5.76l1.5 3.24H7.5L9 10.76Z" />
+    </svg>
+  );
+}
+
 export function ImageIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

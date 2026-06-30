@@ -25,6 +25,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'High-level summary of the uploaded gap dataset.',
     status: 'Stable',
   },
+  search: {
+    title: 'Universal Search',
+    description: 'Locate any stored research result or module — discovery only, no calculations.',
+    status: 'Stable',
+  },
   'market-intelligence': {
     title: 'Market Intelligence',
     description: 'Statistical description of the current market context from recent history.',

@@ -31,11 +31,21 @@ import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
 import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
+import { UniversalSearchView } from '@/components/search/UniversalSearchView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
+
+  // Universal Search reads the stored index, so it is reachable without a dataset.
+  if (view === 'search') {
+    return (
+      <AppLayout>
+        <UniversalSearchView />
+      </AppLayout>
+    );
+  }
 
   // Settings is reachable without a dataset loaded.
   if (view === 'settings') {

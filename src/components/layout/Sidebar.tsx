@@ -25,6 +25,7 @@ import {
   RankIcon,
   RecoveryIcon,
   ReplayIcon,
+  SearchIcon,
   SettingsIcon,
   ShieldIcon,
   SlidersIcon,
@@ -81,6 +82,7 @@ function saveExpanded(state: Record<string, boolean>): void {
 // graceful empty state, or are static placeholders).
 const ALWAYS_ENABLED = new Set<AppView>([
   'overview',
+  'search',
   'settings',
   'repository',
   'ranking',
@@ -106,6 +108,7 @@ export function Sidebar() {
       icon: ChartIcon,
       items: [
         { id: 'overview', label: 'Overview', icon: TableIcon },
+        { id: 'search', label: 'Universal Search', icon: SearchIcon },
         { id: 'market-intelligence', label: 'Market Intelligence', icon: GaugeIcon },
         {
           id: 'events',
