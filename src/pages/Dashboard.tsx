@@ -29,6 +29,7 @@ import { ReplayView } from '@/components/replay/ReplayView';
 import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
 import { isPlaceholderView } from '@/components/layout/moduleMeta';
+import { ProbabilityView } from '@/components/probability/ProbabilityView';
 
 export function Dashboard() {
   const { hasData, isParsing, view } = useData();
@@ -84,6 +85,15 @@ export function Dashboard() {
     return (
       <AppLayout>
         <ComparisonView />
+      </AppLayout>
+    );
+  }
+
+  // Probability Engine handles its own no-data empty state.
+  if (view === 'probability-engine') {
+    return (
+      <AppLayout>
+        <ProbabilityView />
       </AppLayout>
     );
   }

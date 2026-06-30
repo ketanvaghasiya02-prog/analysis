@@ -109,10 +109,8 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
   },
   'probability-engine': {
     title: 'Probability Engine',
-    description: 'Historical probability estimates for stored strategies.',
-    status: 'Coming Soon',
-    about:
-      'The Probability Engine will turn stored research results into empirical probability profiles — recovery probability by holding time, by session and by gap regime — using only the historical occurrences already in the Research Repository. It will never predict future prices; every figure is a frequency from uploaded history.',
+    description: 'Historical probability that a current gap compresses to lower target gaps.',
+    status: 'Experimental',
   },
   'reliability-engine': {
     title: 'Reliability Engine',
@@ -158,7 +156,6 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
 /** Placeholder views — rendered with the coming-soon module placeholder. */
 export const PLACEHOLDER_VIEWS: AppView[] = [
   'market-intelligence',
-  'probability-engine',
   'reliability-engine',
   'walk-forward',
   'reports-daily',
