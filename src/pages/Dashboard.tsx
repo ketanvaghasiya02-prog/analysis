@@ -32,6 +32,7 @@ import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
 import { UniversalSearchView } from '@/components/search/UniversalSearchView';
+import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
 import { ReliabilityView } from '@/components/reliability/ReliabilityView';
 import { WalkForwardView } from '@/components/walkforward/WalkForwardView';
 
@@ -134,6 +135,16 @@ export function Dashboard() {
     return (
       <AppLayout>
         <WalkForwardView />
+      </AppLayout>
+    );
+  }
+
+  // The Reporting Engine composes already-computed research; reachable without
+  // a dataset for record-based reports (it gates dataset-only reports itself).
+  if (view === 'reports') {
+    return (
+      <AppLayout>
+        <ReportingEngineView />
       </AppLayout>
     );
   }

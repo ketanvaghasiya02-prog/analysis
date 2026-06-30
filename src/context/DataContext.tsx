@@ -71,6 +71,7 @@ export type AppView =
   | 'probability-engine'
   | 'reliability-engine'
   | 'walk-forward'
+  | 'reports'
   | 'reports-daily'
   | 'reports-strategy'
   | 'reports-probability'

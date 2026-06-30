@@ -125,6 +125,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'Validate a stored strategy on unseen historical windows (training vs validation).',
     status: 'Experimental',
   },
+  reports: {
+    title: 'Reporting Engine',
+    description: 'Generate professional, descriptive reports from existing research (PDF / CSV / JSON).',
+    status: 'Experimental',
+  },
   'reports-daily': {
     title: 'Daily Reports',
     description: 'Per-day summaries of gap activity and outcomes.',
