@@ -10,16 +10,6 @@
  */
 
 import { useMemo, useRef, useState } from 'react';
-import {
-  Brush,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { useData } from '@/context/DataContext';
 import type { GapSample } from '@/types/gap';
 import {
@@ -28,22 +18,11 @@ import {
   parseClock,
   type TimeRangeResult,
 } from '@/utils/timeAnalysis';
-import { exportChartPng } from '@/utils/chartExport';
+import { TimeChartGroup } from '@/components/timeanalysis/TimeChartGroup';
 import { StatCard } from '@/components/overview/StatCard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { fmtInt, fmtNumber, fmtPercent } from '@/utils/format';
-import { AlertIcon, CalendarIcon, ChartIcon, ChevronIcon, ClockIcon, DownloadIcon, TableIcon, TrashIcon } from '@/components/common/icons';
-
-const AXIS = {
-  tick: { fill: '#64748b', fontSize: 10 },
-  tickLine: false,
-  axisLine: { stroke: '#1e293b' },
-} as const;
-const TOOLTIP = {
-  contentStyle: { background: '#111a2c', border: '1px solid #1e293b', borderRadius: 8, fontSize: 12 },
-  labelStyle: { color: '#94a3b8' },
-  itemStyle: { color: '#e2e8f0' },
-} as const;
+import { AlertIcon, CalendarIcon, ChevronIcon, ClockIcon, TableIcon, TrashIcon } from '@/components/common/icons';
 
 interface Block {
   id: number;
@@ -72,58 +51,9 @@ function delta(v: number | null): { text: string; tone: 'positive' | 'negative' 
   return { text: `${v >= 0 ? '+' : ''}${fmtNumber(v, 2)}`, tone };
 }
 
-// --- one chart with PNG export -----------------------------------------------
-
-function ChartCard({
-  title,
-  data,
-  dataKey,
-  color,
-  decimals,
-}: {
-  title: string;
-  data: TimeRangeResult['series'];
-  dataKey: 'spot' | 'future' | 'gap';
-  color: string;
-  decimals: number;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  return (
-    <div className="card p-4">
-      <header className="mb-2 flex items-center gap-2">
-        <ChartIcon className="text-base text-accent" />
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-ink">{title}</h4>
-        <button
-          type="button"
-          onClick={() => exportChartPng(ref.current, `TimeAnalysis_${title.replace(/\s+/g, '')}`)}
-          className="ml-auto flex items-center gap-1 rounded-md border border-panel-border bg-panel px-2 py-0.5 text-[10px] font-medium text-ink-faint transition-colors hover:border-accent hover:text-accent"
-        >
-          <DownloadIcon className="text-xs" /> PNG
-        </button>
-      </header>
-      <div ref={ref} className="h-52 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -6 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="time" {...AXIS} minTickGap={28} />
-            <YAxis {...AXIS} width={58} domain={['auto', 'auto']} tickFormatter={(v: number) => fmtNumber(v, decimals)} />
-            <Tooltip
-              {...TOOLTIP}
-              formatter={(v: number) => [fmtNumber(v, decimals), title]}
-              labelFormatter={(l) => `Time ${l}`}
-            />
-            <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
-            {data.length > 12 && <Brush dataKey="time" height={16} stroke="#334155" fill="#0b1220" travellerWidth={8} />}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
 // --- summary + description ----------------------------------------------------
 
-function ResultBody({ result }: { result: TimeRangeResult }) {
+function ResultBody({ result, id }: { result: TimeRangeResult; id: number }) {
   if (result.status !== 'ok' || !result.stats) {
     return (
       <div className="p-4">
@@ -149,12 +79,8 @@ function ResultBody({ result }: { result: TimeRangeResult }) {
 
   return (
     <div className="space-y-5 p-4">
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <ChartCard title="Spot Price" data={result.series} dataKey="spot" color="#38bdf8" decimals={2} />
-        <ChartCard title="Future Price" data={result.series} dataKey="future" color="#a78bfa" decimals={2} />
-        <ChartCard title="Gap" data={result.series} dataKey="gap" color="#34d399" decimals={2} />
-      </div>
+      {/* Interactive, synchronized charts */}
+      <TimeChartGroup series={result.series} id={id} />
 
       {/* Summary cards */}
       <div>
@@ -394,7 +320,7 @@ export function TimeAnalysisView() {
 
                 {/* Result */}
                 {result ? (
-                  <ResultBody result={result} />
+                  <ResultBody result={result} id={block.id} />
                 ) : (
                   <div className="p-6 text-center text-sm text-ink-faint">
                     Configure a date and time window, then click <span className="text-ink-muted">Analyze</span>.
