@@ -1,35 +1,48 @@
 /**
- * Time Analysis (new module) — pure, read-only.
+ * Time Analysis (Time Analysis module) — pure, read-only, timezone-aware.
  *
- * Analyses Spot / Future / Gap movement for a user-selected date + time window
- * over the ALREADY-parsed CSV samples. It never re-parses CSV, never calls the
- * Research/Probability engines, and computes no research metrics — only simple
- * descriptive statistics over the selected rows. Descriptive only; no
- * prediction, no recommendation.
+ * Slices the ALREADY-parsed CSV samples for a user-selected date + time window
+ * and reports Spot / Future / Gap movement. The window times are entered in the
+ * user's chosen timezone and converted to the broker server clock (which the CSV
+ * stores) purely for filtering — the original timestamps are never modified.
+ * Descriptive only; no prediction, no recommendation, no engine calls.
  */
 
 import type { GapSample } from '@/types/gap';
 import { syncQualityPct } from '@/utils/statistics';
+import {
+  inputToServerAbsSec,
+  parseClock,
+  serverAbsSec,
+  type TzConfig,
+  type TzKind,
+} from '@/utils/timezone';
+
+// Re-exported for existing consumers.
+export { parseClock, hhmm } from '@/utils/timezone';
 
 export interface TimeRangeInput {
-  date: string; // YYYY-MM-DD (matches sample.dayKey)
-  start: string; // HH:MM
-  end: string; // HH:MM
+  date: string; // YYYY-MM-DD, interpreted in `inputTz`
+  start: string; // HH:MM in inputTz
+  end: string; // HH:MM in inputTz
+  inputTz: TzKind; // timezone the times are entered in
 }
 
-export type RangeStatus = 'ok' | 'empty' | 'no-date' | 'invalid';
+export type RangeStatus = 'ok' | 'empty' | 'invalid';
 
 export interface SeriesPoint {
-  time: string; // HH:MM (axis label)
-  full: string; // HH:MM:SS (tooltip)
+  /** Absolute server-timeline seconds (canonical; tz labels derive from this). */
+  absSec: number;
+  serverFull: string; // HH:MM:SS server
+  serverHHMM: string; // HH:MM server
   spot: number | null;
   future: number | null;
   gap: number | null;
 }
 
 export interface TimeRangeStats {
-  startTime: string;
-  endTime: string;
+  startAbsSec: number; // first row (server timeline)
+  endAbsSec: number; // last row
   startSpot: number | null;
   endSpot: number | null;
   spotChange: number | null;
@@ -40,9 +53,9 @@ export interface TimeRangeStats {
   endGap: number | null;
   gapChange: number | null;
   maxGap: number | null;
-  maxGapTime: string | null;
+  maxGapAbsSec: number | null;
   minGap: number | null;
-  minGapTime: string | null;
+  minGapAbsSec: number | null;
   avgGap: number | null;
   medianGap: number | null;
   gapRange: number | null;
@@ -55,28 +68,14 @@ export interface TimeRangeResult {
   input: TimeRangeInput;
   status: RangeStatus;
   message: string | null;
-  /** First / last sample time available on the selected date (nearest-range hint). */
-  availableStart: string | null;
-  availableEnd: string | null;
+  /** Requested window bounds on the server timeline (for the window summary). */
+  reqStartAbsSec: number | null;
+  reqEndAbsSec: number | null;
+  /** Overall available data range on the server timeline (nearest-range hint). */
+  datasetStartAbsSec: number | null;
+  datasetEndAbsSec: number | null;
   series: SeriesPoint[];
   stats: TimeRangeStats | null;
-  description: string;
-}
-
-/** Parses "HH:MM" or "HH:MM:SS" into seconds-of-day, or null. */
-export function parseClock(s: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s.trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  const sec = m[3] ? Number(m[3]) : 0;
-  if (h > 23 || min > 59 || sec > 59) return null;
-  return h * 3600 + min * 60 + sec;
-}
-
-/** HH:MM slice of a time string. */
-export function hhmm(time: string): string {
-  return time.length >= 5 ? time.slice(0, 5) : time;
 }
 
 const spotOf = (s: GapSample): number | null => s.spotMid ?? s.spotBid ?? null;
@@ -91,28 +90,35 @@ function median(v: number[]): number | null {
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
 }
-function fmt(n: number | null, d = 2): string {
-  return n === null || Number.isNaN(n)
-    ? '—'
-    : n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function datasetBounds(samples: GapSample[]): { min: number | null; max: number | null } {
+  let min: number | null = null;
+  let max: number | null = null;
+  for (const s of samples) {
+    const a = serverAbsSec(s.dayKey, s.time);
+    if (a === null) continue;
+    if (min === null || a < min) min = a;
+    if (max === null || a > max) max = a;
+  }
+  return { min, max };
 }
 
-/** Analyses one date + time window over the parsed samples. Pure. */
-export function analyzeTimeRange(samples: GapSample[], input: TimeRangeInput): TimeRangeResult {
+/** Analyses one date + time window (entered in inputTz) over the samples. Pure. */
+export function analyzeTimeRange(samples: GapSample[], input: TimeRangeInput, cfg: TzConfig): TimeRangeResult {
+  const bounds = datasetBounds(samples);
   const base: TimeRangeResult = {
     input,
     status: 'ok',
     message: null,
-    availableStart: null,
-    availableEnd: null,
+    reqStartAbsSec: null,
+    reqEndAbsSec: null,
+    datasetStartAbsSec: bounds.min,
+    datasetEndAbsSec: bounds.max,
     series: [],
     stats: null,
-    description: '',
   };
 
-  if (!input.date) {
-    return { ...base, status: 'invalid', message: 'Date is required.' };
-  }
+  if (!input.date) return { ...base, status: 'invalid', message: 'Date is required.' };
   const startSec = parseClock(input.start);
   const endSec = parseClock(input.end);
   if (startSec === null || endSec === null) {
@@ -122,62 +128,49 @@ export function analyzeTimeRange(samples: GapSample[], input: TimeRangeInput): T
     return { ...base, status: 'invalid', message: 'Start time must be before end time.' };
   }
 
-  // Rows for the selected date, chronological.
-  const daySamples = samples
-    .filter((s) => s.dayKey === input.date)
-    .sort((a, b) => (parseClock(a.time) ?? 0) - (parseClock(b.time) ?? 0));
+  // Convert the entered (inputTz) window to the absolute SERVER timeline. The
+  // end minute is inclusive (times are entered as HH:MM).
+  const reqStartAbsSec = inputToServerAbsSec(input.date, startSec, input.inputTz, cfg);
+  const reqEndAbsSec = inputToServerAbsSec(input.date, endSec, input.inputTz, cfg);
+  const filterEndAbsSec = inputToServerAbsSec(input.date, endSec + 59, input.inputTz, cfg);
 
-  if (daySamples.length === 0) {
-    return { ...base, status: 'no-date', message: 'Selected date not found in uploaded CSV.' };
-  }
-
-  const availableStart = hhmm(daySamples[0]!.time);
-  const availableEnd = hhmm(daySamples[daySamples.length - 1]!.time);
-
-  // Include the full end minute (end given as HH:MM).
-  const endInclusive = endSec + 59;
-  const rows = daySamples.filter((s) => {
-    const t = parseClock(s.time);
-    return t !== null && t >= startSec && t <= endInclusive;
-  });
+  const rows = samples
+    .map((s) => ({ s, abs: serverAbsSec(s.dayKey, s.time) }))
+    .filter((x): x is { s: GapSample; abs: number } => x.abs !== null && x.abs >= reqStartAbsSec && x.abs <= filterEndAbsSec)
+    .sort((a, b) => a.abs - b.abs);
 
   if (rows.length === 0) {
     return {
       ...base,
       status: 'empty',
-      message: 'No samples found for selected time range.',
-      availableStart,
-      availableEnd,
+      message: 'No data exists for this converted time range.',
+      reqStartAbsSec,
+      reqEndAbsSec,
     };
   }
 
-  const series: SeriesPoint[] = rows.map((s) => ({
-    time: hhmm(s.time),
-    full: s.time,
+  const series: SeriesPoint[] = rows.map(({ s, abs }) => ({
+    absSec: abs,
+    serverFull: s.time,
+    serverHHMM: s.time.slice(0, 5),
     spot: spotOf(s),
     future: futureOf(s),
     gap: s.gap,
   }));
 
-  const first = rows[0]!;
-  const last = rows[rows.length - 1]!;
+  const first = rows[0]!.s;
+  const last = rows[rows.length - 1]!.s;
   const change = (a: number | null, b: number | null) => (a !== null && b !== null ? b - a : null);
 
-  const gapRows = rows.filter((s) => s.gap !== null) as Array<GapSample & { gap: number }>;
-  const gaps = gapRows.map((s) => s.gap);
+  const gapRows = rows.filter((r) => r.s.gap !== null) as Array<{ s: GapSample & { gap: number }; abs: number }>;
+  const gaps = gapRows.map((r) => r.s.gap);
   let maxGap: number | null = null;
-  let maxGapTime: string | null = null;
+  let maxGapAbsSec: number | null = null;
   let minGap: number | null = null;
-  let minGapTime: string | null = null;
-  for (const s of gapRows) {
-    if (maxGap === null || s.gap > maxGap) {
-      maxGap = s.gap;
-      maxGapTime = hhmm(s.time);
-    }
-    if (minGap === null || s.gap < minGap) {
-      minGap = s.gap;
-      minGapTime = hhmm(s.time);
-    }
+  let minGapAbsSec: number | null = null;
+  for (const r of gapRows) {
+    if (maxGap === null || r.s.gap > maxGap) { maxGap = r.s.gap; maxGapAbsSec = r.abs; }
+    if (minGap === null || r.s.gap < minGap) { minGap = r.s.gap; minGapAbsSec = r.abs; }
   }
   const avgGap = mean(gaps);
   const medianGap = median(gaps);
@@ -187,40 +180,30 @@ export function analyzeTimeRange(samples: GapSample[], input: TimeRangeInput): T
   const endSpot = spotOf(last);
   const startFuture = futureOf(first);
   const endFuture = futureOf(last);
-  const startGap = first.gap;
-  const endGap = last.gap;
 
   const stats: TimeRangeStats = {
-    startTime: hhmm(first.time),
-    endTime: hhmm(last.time),
+    startAbsSec: rows[0]!.abs,
+    endAbsSec: rows[rows.length - 1]!.abs,
     startSpot,
     endSpot,
     spotChange: change(startSpot, endSpot),
     startFuture,
     endFuture,
     futureChange: change(startFuture, endFuture),
-    startGap,
-    endGap,
-    gapChange: change(startGap, endGap),
+    startGap: first.gap,
+    endGap: last.gap,
+    gapChange: change(first.gap, last.gap),
     maxGap,
-    maxGapTime,
+    maxGapAbsSec,
     minGap,
-    minGapTime,
+    minGapAbsSec,
     avgGap,
     medianGap,
     gapRange,
     totalSamples: rows.length,
-    sessions: [...new Set(rows.map((s) => s.currentSession).filter(Boolean))].sort(),
-    syncQualityPct: syncQualityPct(rows),
+    sessions: [...new Set(rows.map((r) => r.s.currentSession).filter(Boolean))].sort(),
+    syncQualityPct: syncQualityPct(rows.map((r) => r.s)),
   };
 
-  const description =
-    `From ${stats.startTime} to ${stats.endTime} on ${input.date}, ` +
-    `Spot moved from ${fmt(startSpot)} to ${fmt(endSpot)}, ` +
-    `Future moved from ${fmt(startFuture)} to ${fmt(endFuture)}, ` +
-    `and Gap changed from ${fmt(startGap)} to ${fmt(endGap)}. ` +
-    `The maximum gap during this period was ${fmt(maxGap)}${maxGapTime ? ` at ${maxGapTime}` : ''}, ` +
-    `while the minimum gap was ${fmt(minGap)}${minGapTime ? ` at ${minGapTime}` : ''}.`;
-
-  return { ...base, status: 'ok', availableStart, availableEnd, series, stats, description };
+  return { ...base, status: 'ok', reqStartAbsSec, reqEndAbsSec, series, stats };
 }

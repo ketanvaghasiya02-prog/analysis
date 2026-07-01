@@ -1,15 +1,14 @@
 /**
  * Time Analysis — synchronized, interactive Spot / Future / Gap charts.
  *
- * Professional financial-chart interaction over the SAME windowed data:
- *   - mouse-wheel / trackpad-pinch zoom (centred on the cursor),
- *   - click-and-drag horizontal pan,
- *   - synchronized zoom + pan across all three charts (one shared window),
- *   - shared crosshair + a combined tooltip (Spot, Future, Gap at one time),
- *   - double-click to reset, a toolbar and keyboard shortcuts,
- *   - a bottom range slider (brush) kept in sync with the zoom.
+ * Professional financial-chart interaction over one shared zoom window:
+ * wheel/pinch zoom, drag pan, synchronized across all three charts, a shared
+ * crosshair + combined tooltip, double-click reset, toolbar and keyboard
+ * shortcuts, and a controlled bottom range slider synced with the zoom.
  *
- * Interaction only — it renders the series it is given and computes nothing.
+ * A Display Time toggle re-labels the axis and tooltip between Server / Indian
+ * (IST) / UTC / Custom timezones. Changing it only changes labels — never the
+ * underlying data (which stays on the immutable server timeline).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +23,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { SeriesPoint } from '@/utils/timeAnalysis';
+import { absSecToHHMM, absSecToHHMMSS, TZ_LABEL, type TzConfig, type TzKind } from '@/utils/timezone';
 import { exportChartPng } from '@/utils/chartExport';
 import { fmtNumber } from '@/utils/format';
 import { DownloadIcon } from '@/components/common/icons';
@@ -40,34 +40,47 @@ const SERIES = [
   { key: 'gap', title: 'Gap', color: '#34d399' },
 ] as const;
 
+const DISPLAY_TZS: TzKind[] = ['server', 'ist', 'utc', 'custom'];
 const MIN_SPAN = 2;
-const PLOT_LEFT = 60; // approx y-axis width for cursor→index mapping
+const PLOT_LEFT = 60;
 const PLOT_RIGHT_PAD = 14;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SharedTooltip({ active, payload }: any) {
-  if (!active || !payload || payload.length === 0) return null;
-  const p = payload[0]?.payload as SeriesPoint | undefined;
-  if (!p) return null;
-  const row = (color: string, label: string, v: number | null) => (
-    <div className="flex items-center justify-between gap-4">
-      <span className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
-        <span className="text-ink-muted">{label}</span>
-      </span>
-      <span className="font-mono text-ink">{v === null ? '—' : fmtNumber(v, 2)}</span>
-    </div>
-  );
-  return (
-    <div className="rounded-md border border-panel-border bg-panel-raised px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-mono text-[11px] text-ink-faint">{p.full}</div>
-      <div className="space-y-0.5">
-        {row('#38bdf8', 'Spot', p.spot)}
-        {row('#a78bfa', 'Future', p.future)}
-        {row('#34d399', 'Gap', p.gap)}
+interface ChartPoint extends SeriesPoint {
+  label: string; // HH:MM in display tz
+  displayFull: string; // HH:MM:SS in display tz
+}
+
+function makeTooltip(displayTz: TzKind) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function SharedTooltip({ active, payload }: any) {
+    if (!active || !payload || payload.length === 0) return null;
+    const p = payload[0]?.payload as ChartPoint | undefined;
+    if (!p) return null;
+    const row = (color: string, label: string, v: number | null) => (
+      <div className="flex items-center justify-between gap-4">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
+          <span className="text-ink-muted">{label}</span>
+        </span>
+        <span className="font-mono text-ink">{v === null ? '—' : fmtNumber(v, 2)}</span>
       </div>
-    </div>
-  );
+    );
+    return (
+      <div className="min-w-[9rem] rounded-md border border-panel-border bg-panel-raised px-3 py-2 text-xs shadow-lg">
+        <div className="mb-1 space-y-0.5 font-mono text-[11px]">
+          <div className="flex justify-between gap-4"><span className="text-ink-faint">Server</span><span className="text-ink-muted">{p.serverFull}</span></div>
+          {displayTz !== 'server' && (
+            <div className="flex justify-between gap-4"><span className="text-ink-faint">{TZ_LABEL[displayTz]}</span><span className="text-accent">{p.displayFull}</span></div>
+          )}
+        </div>
+        <div className="space-y-0.5 border-t border-panel-border pt-1">
+          {row('#38bdf8', 'Spot', p.spot)}
+          {row('#a78bfa', 'Future', p.future)}
+          {row('#34d399', 'Gap', p.gap)}
+        </div>
+      </div>
+    );
+  };
 }
 
 function ToolBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
@@ -83,19 +96,36 @@ function ToolBtn({ onClick, title, children }: { onClick: () => void; title: str
   );
 }
 
-export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: number }) {
+export function TimeChartGroup({
+  series,
+  id,
+  displayTz,
+  cfg,
+  onDisplayTzChange,
+}: {
+  series: SeriesPoint[];
+  id: number;
+  displayTz: TzKind;
+  cfg: TzConfig;
+  onDisplayTzChange: (tz: TzKind) => void;
+}) {
   const n = series.length;
   const syncId = `ta-${id}`;
 
+  // Display labels derive from the immutable absSec — toggling tz only re-labels.
+  const data = useMemo<ChartPoint[]>(
+    () => series.map((p) => ({ ...p, label: absSecToHHMM(p.absSec, displayTz, cfg), displayFull: absSecToHHMMSS(p.absSec, displayTz, cfg) })),
+    [series, displayTz, cfg],
+  );
+
   const [win, setWin] = useState<[number, number]>(() => [0, Math.max(0, n - 1)]);
-  // Reset the window whenever the underlying series changes (re-analysis).
   useEffect(() => setWin([0, Math.max(0, n - 1)]), [series, n]);
 
   const winRef = useRef(win);
   winRef.current = win;
   const [lo, hi] = win;
   const span = Math.max(1, hi - lo);
-  const windowed = useMemo(() => series.slice(lo, hi + 1), [series, lo, hi]);
+  const windowed = useMemo(() => data.slice(lo, hi + 1), [data, lo, hi]);
 
   const refs = {
     spot: useRef<HTMLDivElement>(null),
@@ -129,24 +159,12 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
     [n, applyWin],
   );
 
-  const panBy = useCallback(
-    (d: number) => {
-      const [l, h] = winRef.current;
-      applyWin(l + d, h + d);
-    },
-    [applyWin],
-  );
-
+  const panBy = useCallback((d: number) => { const [l, h] = winRef.current; applyWin(l + d, h + d); }, [applyWin]);
   const reset = useCallback(() => setWin([0, Math.max(0, n - 1)]), [n]);
-  const centerIdx = () => {
-    const [l, h] = winRef.current;
-    return (l + h) / 2;
-  };
+  const centerIdx = () => { const [l, h] = winRef.current; return (l + h) / 2; };
   const zoomIn = () => zoomAround(centerIdx(), 0.7);
   const zoomOut = () => zoomAround(centerIdx(), 1 / 0.7);
 
-  // Native, non-passive wheel listeners (zoom centred on the cursor; pinch on a
-  // trackpad arrives as a ctrl+wheel event and is handled the same way).
   useEffect(() => {
     const els = [refs.spot.current, refs.future.current, refs.gap.current].filter(Boolean) as HTMLElement[];
     const onWheel = (e: WheelEvent) => {
@@ -165,7 +183,6 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
     return () => els.forEach((el) => el.removeEventListener('wheel', onWheel));
   }, [zoomAround, refs.spot, refs.future, refs.gap]);
 
-  // Click-and-drag horizontal pan.
   const onChartPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const el = e.currentTarget as HTMLElement;
@@ -205,16 +222,31 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
   };
 
   const interactive = n > MIN_SPAN;
+  const Tip = useMemo(() => makeTooltip(displayTz), [displayTz]);
 
   return (
-    <div
-      tabIndex={0}
-      onKeyDown={onKeyDown}
-      className="space-y-3 rounded-lg outline-none focus:ring-1 focus:ring-accent/40"
-    >
+    <div tabIndex={0} onKeyDown={onKeyDown} className="space-y-3 rounded-lg outline-none focus:ring-1 focus:ring-accent/40">
+      {/* Display Time toggle */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="stat-label mr-1">Display Time</span>
+        {DISPLAY_TZS.map((tz) => (
+          <button
+            key={tz}
+            type="button"
+            onClick={() => onDisplayTzChange(tz)}
+            className={[
+              'rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors',
+              displayTz === tz ? 'border-accent/70 bg-accent/10 text-accent' : 'border-panel-border bg-panel text-ink-muted hover:border-accent hover:text-accent',
+            ].join(' ')}
+          >
+            {TZ_LABEL[tz]}
+          </button>
+        ))}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="stat-label mr-1">Charts</span>
+        <span className="stat-label mr-1">Zoom</span>
         <ToolBtn onClick={reset} title="Reset zoom (R)">Reset Zoom</ToolBtn>
         <ToolBtn onClick={zoomIn} title="Zoom in (+)">Zoom In</ToolBtn>
         <ToolBtn onClick={zoomOut} title="Zoom out (−)">Zoom Out</ToolBtn>
@@ -227,9 +259,7 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
         >
           <DownloadIcon className="text-xs" /> Export PNG
         </button>
-        <span className="ml-auto text-[10px] text-ink-faint">
-          wheel/pinch = zoom · drag = pan · dbl-click = reset · ←/→ pan · +/− zoom · R reset
-        </span>
+        <span className="ml-auto text-[10px] text-ink-faint">wheel/pinch = zoom · drag = pan · dbl-click = reset · ←/→ pan · +/− zoom · R reset</span>
       </div>
 
       {/* Charts */}
@@ -250,9 +280,9 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart syncId={syncId} data={windowed} margin={{ top: 8, right: 12, bottom: 0, left: -6 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="time" {...AXIS} minTickGap={28} />
+                  <XAxis dataKey="label" {...AXIS} minTickGap={28} />
                   <YAxis {...AXIS} width={58} domain={['auto', 'auto']} tickFormatter={(v: number) => fmtNumber(v, 2)} />
-                  <Tooltip cursor={{ stroke: '#64748b', strokeDasharray: '3 3' }} content={<SharedTooltip />} />
+                  <Tooltip cursor={{ stroke: '#64748b', strokeDasharray: '3 3' }} content={<Tip />} />
                   <Line type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
@@ -261,23 +291,21 @@ export function TimeChartGroup({ series, id }: { series: SeriesPoint[]; id: numb
         ))}
       </div>
 
-      {/* Bottom range slider — controlled, synced with the zoom window */}
+      {/* Bottom range slider — controlled, synced with zoom */}
       {n > MIN_SPAN && (
         <div className="card px-4 pb-2 pt-3">
           <div className="mb-1 flex items-center justify-between">
             <span className="stat-label">Range</span>
-            <span className="font-mono text-[10px] text-ink-faint">
-              {windowed[0]?.time} – {windowed[windowed.length - 1]?.time} · {windowed.length}/{n}
-            </span>
+            <span className="font-mono text-[10px] text-ink-faint">{windowed[0]?.label} – {windowed[windowed.length - 1]?.label} · {windowed.length}/{n}</span>
           </div>
           <div className="h-16 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series} margin={{ top: 4, right: 12, bottom: 0, left: -6 }}>
-                <XAxis dataKey="time" hide />
+              <LineChart data={data} margin={{ top: 4, right: 12, bottom: 0, left: -6 }}>
+                <XAxis dataKey="label" hide />
                 <YAxis hide domain={['auto', 'auto']} />
                 <Line type="monotone" dataKey="gap" stroke="#334155" strokeWidth={1} dot={false} isAnimationActive={false} connectNulls />
                 <Brush
-                  dataKey="time"
+                  dataKey="label"
                   height={22}
                   startIndex={lo}
                   endIndex={hi}
