@@ -21,6 +21,7 @@ import { fmtInt } from '@/utils/format';
 import {
   ChartIcon,
   ChevronIcon,
+  ClockIcon,
   CompareIcon,
   DatabaseIcon,
   FileIcon,
@@ -92,6 +93,7 @@ const SECTIONS: NavSection[] = [
       { label: 'Overview', icon: TableIcon, view: 'overview' },
       { label: 'Universal Search', icon: SearchIcon, view: 'search' },
       { label: 'Market Intelligence', icon: GaugeIcon, view: 'market-intelligence' },
+      { label: 'Time Analysis', icon: ClockIcon, view: 'time-analysis' },
     ],
   },
   {
@@ -214,6 +216,7 @@ function gateFor(view: AppView, s: WorkflowState): Gate {
 
     // Need CSV data.
     case 'market-intelligence':
+    case 'time-analysis':
     case 'lab':
     case 'sl-optimizer':
     case 'strategy-finder':

@@ -31,6 +31,7 @@ import { ModulePlaceholder } from '@/components/common/ModulePlaceholder';
 import { isPlaceholderView } from '@/components/layout/moduleMeta';
 import { ProbabilityView } from '@/components/probability/ProbabilityView';
 import { MarketContextView } from '@/components/market/MarketContextView';
+import { TimeAnalysisView } from '@/components/timeanalysis/TimeAnalysisView';
 import { UniversalSearchView } from '@/components/search/UniversalSearchView';
 import { ReportingEngineView } from '@/components/reports/ReportingEngineView';
 import { AiAssistantView } from '@/components/assistant/AiAssistantView';
@@ -227,6 +228,8 @@ export function Dashboard() {
     content = <ExplorerView />;
   } else if (view === 'session') {
     content = <SessionView />;
+  } else if (view === 'time-analysis') {
+    content = <TimeAnalysisView />;
   } else if (view === 'lab') {
     content = <ResearchLabView />;
   } else if (view === 'sl-optimizer') {

@@ -40,6 +40,11 @@ export const MODULE_META: Record<AppView, ModuleMeta> = {
     description: 'Detected gap-zone entry/exit events across the dataset.',
     status: 'Stable',
   },
+  'time-analysis': {
+    title: 'Time Analysis',
+    description: 'Spot, Future and Gap movement over custom date/time windows from uploaded CSV.',
+    status: 'Stable',
+  },
   explorer: {
     title: 'Event Explorer',
     description: 'Inspect and replay individual detected events.',

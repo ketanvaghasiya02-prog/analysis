@@ -52,6 +52,7 @@ import { loadSettings, saveSettings } from '@/utils/settings';
 export type AppView =
   | 'overview'
   | 'search'
+  | 'time-analysis'
   | 'events'
   | 'recovery'
   | 'mae'
